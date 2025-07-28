@@ -1,23 +1,26 @@
-# PressReader News Search (Coffee Example)
+# 📰 PressReader Coffee Article Scraper
 
-This Colab notebook demonstrates how to query the [PressReader API](https://www.pressreader.com/) for articles on a given topic (e.g., "coffee"), store the results in a local SQLite database, and display them in a structured format.
+This notebook queries the [PressReader API](https://www.pressreader.com/) for articles related to **coffee**, stores the results in a **SQLite** database, and outputs a Markdown-friendly summary of each article. It's ideal for researchers, librarians, and hobbyists looking to explore coffee-related news and publications.
 
-## Features
+---
 
-- 🔎 Search PressReader API with JSON payload
-- 🗃️ Store article metadata in SQLite
-- 📋 Display results in readable Markdown-style output
-- 🧱 Built with: Python, requests, sqlite3
+## 🚀 Features
 
-## Usage
+- 🔍 Searches the PressReader API for any keyword (default: `coffee`)
+- 🧠 Saves article metadata (title, description, source, date, URL) to a SQLite database
+- 🔁 Prevents duplicate entries using article ID
+- 📝 Outputs results as readable Markdown
+- 🔐 Uses a secure environment variable for your API key
 
-1. Clone the repo or open the notebook in Colab.
-2. Set your API key via `os.environ['PRESSREADER_API_KEY']` or hardcode it (not recommended).
-3. Run the notebook and explore the stored articles.
+---
 
-## Example Query
+## 📄 Example Output
 
-```json
-{
-  "query": "coffee"
-}
+Here’s what the Markdown-formatted article summaries look like:
+
+☕ Coffee and Culture
+
+Publication: Global Coffee Times
+Date: 2025-07-28
+Description: Exploring how coffee influences social rituals across continents.
+URL: Read More
