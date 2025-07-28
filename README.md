@@ -1,4 +1,4 @@
-# 📰 PressReader Coffee Article Scraper
+# 📰 PressReader Article Scraper (Example: Coffee News)
 
 This notebook queries the [PressReader API](https://www.pressreader.com/) for articles related to **coffee**, stores the results in a **SQLite** database, and outputs a Markdown-friendly summary of each article. It's ideal for researchers, librarians, and hobbyists looking to explore coffee-related news and publications.
 
