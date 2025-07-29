@@ -1,6 +1,9 @@
-# 📰 PressReader Article Scraper (Example: Coffee News)
+# 📰 PressReader API to SQLite (Coffee Article Collector)
 
-This notebook queries the [PressReader API](https://www.pressreader.com/) for articles related to **coffee**, stores the results in a **SQLite** database, and outputs a Markdown-friendly summary of each article. It's ideal for researchers, librarians, and hobbyists looking to explore coffee-related news and publications.
+This notebook queries the [PressReader API](https://www.pressreader.com/) for articles related to **coffee**, stores the results in a **SQLite** database, and outputs a Markdown-friendly summary of each article.  
+It's ideal for researchers, librarians, and hobbyists looking to explore coffee-related news and publications.
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/your-username/your-repo/blob/main/pressreader_api_to_sqlite.ipynb)
 
 ---
 
@@ -8,7 +11,7 @@ This notebook queries the [PressReader API](https://www.pressreader.com/) for ar
 
 - 🔍 Searches the PressReader API for any keyword (default: `coffee`)
 - 🧠 Saves article metadata (title, description, source, date, URL) to a SQLite database
-- 🔁 Prevents duplicate entries using article ID
+- 🔁 Prevents duplicate entries using article ID as a primary key
 - 📝 Outputs results as readable Markdown
 - 🔐 Uses a secure environment variable for your API key
 
@@ -18,25 +21,28 @@ This notebook queries the [PressReader API](https://www.pressreader.com/) for ar
 
 Here’s what the Markdown-formatted article summaries look like:
 
-```
-## ☕ Coffee and Culture
-
+<pre>
+## ☕ Coffee and Culture  
 **Publication**: Global Coffee Times  
 **Date**: 2025-07-28  
 **Description**: Exploring how coffee influences social rituals across continents.  
 **URL**: [Read More](https://www.pressreader.com/article/12345678)
-```
 
-```
-## ☕ Sustainable Coffee Farming
-
+## ☕ Sustainable Coffee Farming  
 **Publication**: Eco Agri News  
 **Date**: 2025-07-25  
 **Description**: A closer look at regenerative practices in coffee production.  
 **URL**: [Read More](https://www.pressreader.com/article/98765432)
-```
+</pre>
 
 ---
+
+## 📦 Requirements
+
+Install required dependencies:
+
+```bash
+pip install requests
 
 ## 📦 Requirements
 
@@ -64,8 +70,8 @@ os.environ['PRESSREADER_API_KEY'] = 'your-api-key-here'
 ### ✅ Or with Colab secrets:
 
 ```python
-from google.colab import userdata
-api_key = userdata.get('PRESSREADER_API_KEY')
+from google.colab import userdata  
+userdata.set_secret('PRESSREADER_API_KEY')
 ```
 
 ---
@@ -83,14 +89,19 @@ README.md                                      # Documentation
 
 ## 🧰 How It Works
 
-1. Sends a POST request to the PressReader API.
-2. Parses JSON results into structured fields.
-3. Saves new articles into `pressreader_coffee_results.db`.
-4. Outputs clean Markdown-style summaries.
-5. Skips duplicates by checking the `id` field.
+1. Sends a POST request to the PressReader Discovery API with a keyword (e.g. "coffee").
+2. Parses the JSON results into article metadata: ID, title, description, publication name, date, and URL.
+3. Stores each article in a local SQLite database (pressreader_coffee_results.db).
+4. Skips duplicates using the article ID as a primary key.
+5. Displays Markdown summaries of the most recent articles.
 
 ---
-
+## 📁 Files in This Project
+pressreader_api_to_sqlite.ipynb    # Main Colab notebook
+README.md                          # Project documentation
+⚠️ The SQLite database file (pressreader_coffee_results.db) is created at runtime.
+---
+    
 ## ⚠️ Disclaimer
 
 - This project is for educational or research use only.
