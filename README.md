@@ -69,8 +69,8 @@ userdata.set_secret('PRESSREADER_API_KEY')
 
 ## 📁 Files in This Project
 
-pressreader_api_to_sqlite.ipynb    # Main Colab notebook
-README.md                          # Project documentation
+**pressreader_api_to_sqlite.ipynb    # Main Colab notebook
+**README.md                          # Project documentation
 ⚠️ The SQLite database file (`pressreader_coffee_results.db`) will be created during runtime.
 
 ---
@@ -82,14 +82,9 @@ README.md                          # Project documentation
 3. Stores each article in a local SQLite database (pressreader_coffee_results.db).
 4. Skips duplicates using the article ID as a primary key.
 5. Displays Markdown summaries of the most recent articles.
+   
+---
 
----
-## 📁 Files in This Project
-pressreader_api_to_sqlite.ipynb    # Main Colab notebook
-README.md                          # Project documentation
-⚠️ The SQLite database file (pressreader_coffee_results.db) is created at runtime.
----
-    
 ## ⚠️ Disclaimer
 
 - This project is for educational or research use only.
