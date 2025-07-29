@@ -1,7 +1,11 @@
-# 📰 PressReader API to SQLite (Coffee Article Collector)
+# 📰 PressReader API to SQLite (Demo Project: Coffee Article Collector)
 
-This notebook queries the [PressReader API](https://www.pressreader.com/) for articles related to **coffee**, stores the results in a **SQLite** database, and outputs a Markdown-friendly summary of each article.  
+This notebook demonstrates how to query the [PressReader API](https://www.pressreader.com/) and store results in a **SQLite** database.  
+It uses **coffee** as a sample keyword but can be adapted for any topic or term.
 It's ideal for researchers, librarians, and hobbyists looking to explore coffee-related news and publications.
+- Integrate a public news API
+- Persist article metadata locally using SQLite
+- Output summaries in Markdown format
 
 ---
 
