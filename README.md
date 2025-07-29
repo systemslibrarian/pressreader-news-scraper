@@ -3,8 +3,6 @@
 This notebook queries the [PressReader API](https://www.pressreader.com/) for articles related to **coffee**, stores the results in a **SQLite** database, and outputs a Markdown-friendly summary of each article.  
 It's ideal for researchers, librarians, and hobbyists looking to explore coffee-related news and publications.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/your-username/your-repo/blob/main/pressreader_api_to_sqlite.ipynb)
-
 ---
 
 ## 🚀 Features
