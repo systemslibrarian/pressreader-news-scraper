@@ -43,7 +43,7 @@ Install the required dependencies:
 ```bash
 pip install requests
 
-> `sqlite3` is included by default in Python and Colab environments.
+Note: `sqlite3` is included by default in Python and Colab environments.
 
 ---
 
