@@ -69,12 +69,9 @@ userdata.set_secret('PRESSREADER_API_KEY')
 
 ## 📁 Files in This Project
 
-```
-pressreader_coffee_search_with_sqlite.ipynb   # Main Colab notebook
-README.md                                      # Documentation
-```
-
-> ⚠️ The SQLite database file will be created during runtime.
+pressreader_api_to_sqlite.ipynb    # Main Colab notebook
+README.md                          # Project documentation
+⚠️ The SQLite database file will be created during runtime.
 
 ---
 
