@@ -35,20 +35,13 @@ Here’s what the Markdown-formatted article summaries look like:
 
 ---
 
-## 📦 Requirements
-
-Install required dependencies:
-
-```bash
-pip install requests
 
 ## 📦 Requirements
 
-Install dependencies:
+Install the required dependencies:
 
 ```bash
 pip install requests
-```
 
 > `sqlite3` is included by default in Python and Colab environments.
 
