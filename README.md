@@ -1,7 +1,9 @@
 # 📰 PressReader API to SQLite  
 **Demo Project: Coffee Article Collector**
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/your-username/pressreader-api-to-sqlite/blob/main/pressreader_api_to_sqlite.ipynb)
+> 🔑 **Note:** You must set your own API key before running this notebook.
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/systemslibrarian/pressreader-news-scraper/blob/main/pressreader_api_to_sqlite.ipynb)
 
 This notebook demonstrates how to query the [PressReader API](https://www.pressreader.com/) and store results in a **SQLite** database.  
 It uses **coffee** as a sample keyword but can be adapted for any topic or term.  
@@ -107,5 +109,5 @@ userdata.set_secret('PRESSREADER_API_KEY')
 
 ---
 
-**Created by [Paul Clark](https://github.com/your-username)**  
+**Created by [Paul Clark](https://github.com/systemslibrarian)**  
 Empowering Libraries Through Data and Innovation 📚⚙️
