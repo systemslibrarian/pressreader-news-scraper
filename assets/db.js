@@ -147,9 +147,14 @@ CREATE TABLE IF NOT EXISTS articles (
   publication      TEXT,
   publication_cid  TEXT,
   publication_type TEXT,
+  publisher        TEXT,
+  issn             TEXT,
   author           TEXT,
+  section          TEXT,
+  content          TEXT,
   date             TEXT,
   page             INTEGER,
+  issue_page_count INTEGER,
   language         TEXT,
   countries        TEXT,
   categories       TEXT,
@@ -214,7 +219,10 @@ export const ARTICLE_COLUMNS = [
   { key: 'date',             label: 'Date',             core: true,  width: 12 },
   { key: 'author',           label: 'Author',           core: true,  width: 22 },
   { key: 'url',              label: 'Article URL',      core: true,  width: 46 },
+  { key: 'section',          label: 'Section',          core: false, width: 16 },
+  { key: 'content',          label: 'Full text',        core: false, width: 90 },
   { key: 'page',             label: 'Page',             core: false, width: 7  },
+  { key: 'issue_page_count', label: 'Pages in issue',   core: false, width: 13 },
   { key: 'language',         label: 'Language',         core: false, width: 10 },
   { key: 'countries',        label: 'Countries',        core: false, width: 12 },
   { key: 'categories',       label: 'Categories',       core: false, width: 24 },
@@ -222,6 +230,8 @@ export const ARTICLE_COLUMNS = [
   { key: 'sentiment',        label: 'Sentiment',        core: false, width: 11 },
   { key: 'publication_cid',  label: 'Publication CID',  core: false, width: 15 },
   { key: 'publication_type', label: 'Publication type', core: false, width: 16 },
+  { key: 'publisher',        label: 'Publisher',        core: false, width: 24 },
+  { key: 'issn',             label: 'ISSN',             core: false, width: 12 },
   { key: 'copyright',        label: 'Copyright',        core: false, width: 28 },
   { key: 'issue_url',        label: 'Issue URL',        core: false, width: 40 },
   { key: 'publication_url',  label: 'Publication URL',  core: false, width: 40 },
@@ -234,7 +244,7 @@ export const ARTICLE_COLUMNS = [
 ];
 
 /** Columns whose SQLite affinity is numeric. */
-export const NUMERIC_COLUMNS = new Set(['page', 'media_count']);
+export const NUMERIC_COLUMNS = new Set(['page', 'media_count', 'issue_page_count']);
 
 const INSERT_COLS = ARTICLE_COLUMNS.map((c) => c.key).filter((k) => k !== 'first_run_id');
 

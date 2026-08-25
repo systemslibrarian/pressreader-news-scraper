@@ -166,7 +166,9 @@ export function normaliseItem(item, { query = '', keepRaw = true } = {}) {
   const issue = item?.issue || {};
   const page = item?.page || {};
   const media = Array.isArray(article.media) ? article.media : [];
-  const image = media.find((m) => m && (m.type === 'image' || m.typeName === 'image')) || media[0];
+  // The live API sends typeName: "Image" (capitalised) and a numeric type,
+  // which is not what the published schema's lowercase enum suggests.
+  const image = media.find((m) => m && String(m.typeName ?? '').toLowerCase() === 'image') || media[0];
 
   const authors = joinNames(article.authors);
   const date = str(issue.date);
@@ -179,9 +181,15 @@ export function normaliseItem(item, { query = '', keepRaw = true } = {}) {
     publication: str(publication.title),
     publication_cid: str(publication.cid),
     publication_type: str(publication.publicationType),
+    publisher: str(publication.publisher?.name ?? publication.publisher),
+    issn: str(publication.issn),
     author: str(article.author) || authors,
+    section: str(article.section),
+    content: str(item?.content ?? article.content),
     date: date ? date.split('T')[0] : null,
     page: Number.isFinite(Number(page.number)) && page.number !== null ? Number(page.number) : null,
+    issue_page_count: Number.isFinite(Number(issue.pageCount)) && issue.pageCount !== null
+      ? Number(issue.pageCount) : null,
     language: str(publication.language),
     countries: Array.isArray(publication.countries) ? publication.countries.join(', ') : str(publication.countries),
     categories: joinNames(item?.categories),
@@ -211,7 +219,7 @@ function describeHttpError(status, text) {
   if (status === 400) {
     return new ApiError('The API rejected the request as invalid (400).', {
       kind: 'request', status, detail,
-      hint: 'The Discovery API documents "countries" as a required field — try adding one, e.g. US or GB. Also check the date range and any extra JSON.',
+      hint: 'The message above comes from PressReader. Common causes: an unsupported country or language code, a malformed date, or invalid extra JSON.',
     });
   }
   if (status === 401 || status === 403) {
@@ -376,7 +384,7 @@ export async function testConnection({ apiKey, conn, signal }) {
     await fetchPage({
       apiKey,
       conn,
-      body: { query: 'test', countries: ['US'] },
+      body: { query: 'test' },
       offset: 0,
       limit: 1,
       signal,

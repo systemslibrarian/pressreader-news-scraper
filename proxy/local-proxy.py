@@ -6,6 +6,17 @@ and your API key never leaves your computer.
 
     python3 local-proxy.py         # then open the app and use http://127.0.0.1:8787
 
+IMPORTANT: serve the app itself locally too --
+
+    python3 -m http.server 8000    # then open http://localhost:8000
+
+Chrome blocks a page loaded over public HTTPS (a github.io address) from
+reaching a loopback address such as this proxy: "Permission was denied for
+this request to access the `loopback` address space". Serving the page from
+localhost puts both sides in the same address space, so the block does not
+apply. If you would rather use the hosted copy of the app, deploy the
+Cloudflare Worker instead -- it has a public HTTPS address.
+
 Requires nothing but a standard Python 3 install. Ctrl-C to stop.
 """
 import http.server
@@ -17,9 +28,11 @@ ALLOWED_PREFIX = "/discovery/"
 PORT = 8787
 # The page origins allowed to use this proxy.
 ALLOWED_ORIGINS = {
-    "https://systemslibrarian.github.io",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    # Kept for completeness, but see the note above: current Chrome blocks a
+    # public HTTPS page from reaching loopback regardless of these headers.
+    "https://systemslibrarian.github.io",
 }
 FORWARD = ("api-key", "content-type", "accept")
 
@@ -35,6 +48,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "api-key, content-type, accept")
         self.send_header("Access-Control-Max-Age", "86400")
+        # Chrome's Private Network Access check, for a page that is allowed to
+        # reach loopback at all. Newer Chrome also asks the user's permission.
+        self.send_header("Access-Control-Allow-Private-Network", "true")
         self.send_header("Vary", "Origin")
 
     def _origin(self):

@@ -118,11 +118,11 @@
             </p>
           </div>
           <div class="field field--wide">
-            <label class="label" for="countries">Countries <span class="badge badge--warn">required by the API</span></label>
-            <input type="text" id="countries" value="US" placeholder="US, GB, CA" spellcheck="false">
+            <label class="label" for="countries">Countries <span class="muted">(optional)</span></label>
+            <input type="text" id="countries" placeholder="US, GB, CA" spellcheck="false">
             <p class="hint">
               Two-letter ISO codes, comma separated — the country the <em>publication</em> comes from.
-              The Discovery API documents this as required; leaving it empty usually returns a 400.
+              Leave empty to search everywhere. An unsupported code returns a 400 naming the code.
             </p>
           </div>
           <div class="field">
@@ -584,11 +584,23 @@ ORDER BY articles DESC;</textarea>
             Python 3 install. Run <code>python3 local-proxy.py</code>, then put
             <code>http://127.0.0.1:8787</code> in the Proxy URL box above. Your key never leaves your computer.
           </p>
+          <div class="note note--warn">
+            <span class="note__icon">⚠️</span>
+            <div class="note__body">
+              <strong>Serve this page locally too.</strong> Current Chrome blocks a page loaded over public
+              HTTPS from reaching a loopback address — <em>“Permission was denied for this request to access
+              the <code>loopback</code> address space”</em> — so a local proxy will not work with the hosted
+              copy of this app. Download the repository and run
+              <code>python3 -m http.server 8000</code>, then use the app at
+              <code>http://localhost:8000</code>. Both sides are then in the same address space and the block
+              does not apply. To use the hosted copy, deploy the Cloudflare Worker instead: it has a public
+              HTTPS address.
+            </div>
+          </div>
           <p>
             It binds to <code>127.0.0.1</code> only, so nothing else on your network can reach it, and it does
-            not log requests. It works even with this page served from GitHub Pages, because browsers treat
-            <code>localhost</code> as a secure origin. The trade-off: it has to be running each time you use the
-            app, and you cannot share it with a colleague.
+            not log requests. The trade-off: it has to be running each time you use the app, and you cannot
+            share it with a colleague.
           </p>
           <a class="btn btn--sm" href="proxy/local-proxy.py" download>⬇️ Download <code>local-proxy.py</code></a>
         </div>
@@ -645,6 +657,15 @@ ORDER BY articles DESC;</textarea>
           server changes your page's address but has nothing to do with the request to PressReader, which still
           gets blocked. You need it to load this app from your own machine at all — ES modules will not run over
           <code>file://</code> — but it does nothing for the API call.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>“Permission was denied … to access the <code>loopback</code> address space”</summary>
+        <div class="disclosure__body">
+          <p>You pointed the hosted (HTTPS) copy of this app at a proxy on <code>127.0.0.1</code>. Chrome does
+          not allow that. Either run this app locally as well (<code>python3 -m http.server 8000</code>, then
+          open <code>http://localhost:8000</code>), or deploy the Cloudflare Worker, which has a public HTTPS
+          address and works from anywhere.</p>
         </div>
       </details>
       <details class="disclosure">
