@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PressReader Collector — search, store &amp; export news articles</title>
+<meta name="description" content="A no-server web app: search the PressReader Discovery API with your own key, store results in a SQLite database in your browser, and export to Excel, CSV, JSON, Markdown or a .db file.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%B0%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead__inner">
+    <div class="wordmark">
+      <span class="wordmark__title">📰 PressReader Collector</span>
+      <span class="wordmark__rule">Search · Store · Export</span>
+    </div>
+    <div class="masthead__actions">
+      <span class="badge" id="dbBadge" title="Rows currently in your browser database">
+        <span class="dot"></span><span id="dbBadgeText">Loading…</span>
+      </span>
+      <button class="btn btn--sm btn--icon btn--ghost" id="themeBtn" title="Switch light / dark theme" aria-label="Switch theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<nav class="tabstrip" aria-label="Sections">
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-search"   aria-controls="panel-search"   aria-selected="true">🔍 Search</button>
+    <button class="tab" role="tab" id="tab-results"  aria-controls="panel-results"  aria-selected="false">📄 Results <span class="pip" id="pipResults">0</span></button>
+    <button class="tab" role="tab" id="tab-database" aria-controls="panel-database" aria-selected="false">🗄️ Database</button>
+    <button class="tab" role="tab" id="tab-export"   aria-controls="panel-export"   aria-selected="false">📤 Export</button>
+    <button class="tab" role="tab" id="tab-help"     aria-controls="panel-help"     aria-selected="false">❓ Setup &amp; Help</button>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- ══════════════════════════════════════════════════════════ SEARCH ═══ -->
+<section class="panel stack" id="panel-search" role="tabpanel" aria-labelledby="tab-search">
+
+  <div class="note note--info" id="firstRunNote">
+    <span class="note__icon">👋</span>
+    <div class="note__body">
+      <strong>Everything here runs in your browser.</strong> Your API key and your saved articles never leave
+      this device — there is no server behind this page. Data lives in a real SQLite database held in your
+      browser's storage, and you can download it as a <code>.db</code> file at any time.
+      <br>
+      No key yet? <button class="btn btn--sm" id="loadDemoBtn" type="button">Load sample data</button>
+      to try the whole workflow first.
+    </div>
+  </div>
+
+  <div class="note note--warn" id="connBanner" hidden>
+    <span class="note__icon">🔌</span>
+    <div class="note__body">
+      <strong>No proxy configured — live searches will fail.</strong>
+      PressReader's API sends no CORS headers, so browsers block direct calls to it. Set up the free
+      one-file proxy on the <button class="btn btn--sm" data-goto="help" type="button">Setup &amp; Help</button>
+      tab (about five minutes, once), or work with sample data and imported <code>.db</code> files for now.
+    </div>
+  </div>
+
+  <!-- API key -->
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">🔑 Your PressReader API key <small>required for live searches</small></div>
+      <div class="card__actions">
+        <span class="badge" id="keyBadge"><span class="dot"></span><span id="keyBadgeText">Not set</span></span>
+      </div>
+    </div>
+    <div class="card__body stack">
+      <div class="field">
+        <label class="label" for="apiKey">API key</label>
+        <div class="inputgroup">
+          <input type="password" id="apiKey" placeholder="Paste your PressReader Discovery API key"
+                 autocomplete="off" spellcheck="false" aria-describedby="apiKeyHint">
+          <button class="btn btn--icon" id="toggleKeyBtn" type="button" title="Show / hide key" aria-label="Show or hide key">👁️</button>
+          <button class="btn btn--danger btn--sm" id="clearKeyBtn" type="button" title="Forget this key">Clear</button>
+        </div>
+        <p class="hint" id="apiKeyHint">
+          Sent only to PressReader (or to the proxy you configure). Never transmitted anywhere else,
+          never logged, never included in exports.
+        </p>
+      </div>
+      <label class="checkline">
+        <input type="checkbox" id="rememberKey">
+        <span>Remember this key on this device
+          <em>Stores it in this browser's <code>localStorage</code>. Leave unchecked on shared or public computers — then the key is kept only until you close the tab.</em>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Search form -->
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">🔍 Search the PressReader Discovery API</div>
+      <div class="card__actions">
+        <button class="btn btn--sm btn--ghost" id="resetSearchBtn" type="button">Reset form</button>
+      </div>
+    </div>
+    <div class="card__body">
+      <form id="searchForm" class="stack" novalidate>
+        <div class="grid grid--2">
+          <div class="field field--wide">
+            <label class="label" for="query">Search terms</label>
+            <input type="text" id="query" value="coffee" placeholder="coffee AND sustainable NOT decaf" required>
+            <p class="hint">
+              Supports <code>AND</code> / <code>OR</code> / <code>NOT</code>, brackets, an
+              <code>"exact phrase"</code>, wildcards (<code>Colo?r</code>, <code>Bro*</code>),
+              proximity (<code>Trump NEAR/5 Biden</code>) and
+              <code>category:</code> / <code>entity:</code> / <code>sentiment:POSITIVE</code>.
+            </p>
+          </div>
+          <div class="field field--wide">
+            <label class="label" for="countries">Countries <span class="badge badge--warn">required by the API</span></label>
+            <input type="text" id="countries" value="US" placeholder="US, GB, CA" spellcheck="false">
+            <p class="hint">
+              Two-letter ISO codes, comma separated — the country the <em>publication</em> comes from.
+              The Discovery API documents this as required; leaving it empty usually returns a 400.
+            </p>
+          </div>
+          <div class="field">
+            <label class="label" for="startDate">Published from</label>
+            <input type="date" id="startDate">
+            <p class="hint">On or after this date.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="endDate">Published to</label>
+            <input type="date" id="endDate">
+            <p class="hint">Before this date.</p>
+          </div>
+        </div>
+
+        <div class="grid grid--4">
+          <div class="field">
+            <label class="label" for="wantTotal">Articles to fetch</label>
+            <input type="number" id="wantTotal" value="25" min="1" max="5000" step="1">
+            <p class="hint">Paged automatically.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="pageSize">Per request</label>
+            <input type="number" id="pageSize" value="25" min="1" max="200" step="1">
+            <p class="hint">The API's <code>limit</code>.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="startOffset">Start at offset</label>
+            <input type="number" id="startOffset" value="0" min="0" step="1">
+            <p class="hint">Skip the first N hits.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="sortOrder">Sort</label>
+            <select id="sortOrder">
+              <option value="">API default (relevance)</option>
+              <option value="date">Newest first</option>
+              <option value="relevance">Most relevant</option>
+            </select>
+          </div>
+        </div>
+
+        <details class="disclosure">
+          <summary>More filters</summary>
+          <div class="disclosure__body stack">
+            <div class="grid grid--2">
+              <div class="field">
+                <label class="label" for="languages">Languages</label>
+                <input type="text" id="languages" placeholder="en, fr" spellcheck="false">
+                <p class="hint">Two-letter ISO codes, comma separated.</p>
+              </div>
+              <div class="field">
+                <label class="label" for="author">Author</label>
+                <input type="text" id="author" placeholder="Family name">
+                <p class="hint">Can be used instead of search terms.</p>
+              </div>
+              <div class="field">
+                <label class="label" for="cids">Publication IDs (CIDs)</label>
+                <input type="text" id="cids" placeholder="0001, tb39" spellcheck="false">
+                <p class="hint">Four characters each, comma separated. Restricts the search to those titles.</p>
+              </div>
+              <div class="field">
+                <label class="label" for="searchIn">Search in</label>
+                <select id="searchIn">
+                  <option value="">Everywhere (default)</option>
+                  <option value="header">Headlines only</option>
+                  <option value="body">Body text only</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="label" for="itemTypes">Result type</label>
+                <select id="itemTypes">
+                  <option value="">Articles (default)</option>
+                  <option value="page">Whole pages</option>
+                </select>
+              </div>
+              <div class="field field--wide">
+                <label class="label" for="extraParams">Extra JSON merged into the request body</label>
+                <textarea id="extraParams" rows="3" placeholder='{"cids": ["0001"]}' spellcheck="false"></textarea>
+                <p class="hint">For anything this form does not expose. Must be a JSON object; it overrides the fields above where keys collide.</p>
+              </div>
+            </div>
+            <label class="checkline">
+              <input type="checkbox" id="storeRaw" checked>
+              <span>Keep the raw JSON for every article
+                <em>Lets you query and export fields this app does not model. Uses more space.</em>
+              </span>
+            </label>
+            <label class="checkline">
+              <input type="checkbox" id="updateExisting">
+              <span>Refresh articles already in the database
+                <em>Off: duplicates are skipped and counted. On: existing rows are overwritten with the newer copy.</em>
+              </span>
+            </label>
+          </div>
+        </details>
+
+        <div class="card__actions" style="margin-left:0">
+          <button class="btn btn--primary" id="searchBtn" type="submit">🔍 Search &amp; save to database</button>
+          <button class="btn" id="previewBtn" type="button" title="Fetch one page and show it without saving">👁️ Preview only</button>
+          <button class="btn btn--ghost" id="cancelBtn" type="button" hidden>Cancel</button>
+        </div>
+
+        <div id="searchProgress" hidden>
+          <div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
+          <p class="hint" id="progressText" style="margin-top:7px" aria-live="polite"></p>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Run log -->
+  <div class="card" id="runLogCard" hidden>
+    <div class="card__head">
+      <div class="card__title">🧾 Search history <small>every run recorded in the database</small></div>
+      <div class="card__actions">
+        <button class="btn btn--sm btn--ghost" id="clearRunsBtn" type="button">Clear history</button>
+      </div>
+    </div>
+    <div class="card__body card__body--flush">
+      <div class="tablewrap"><table class="data" id="runsTable">
+        <thead><tr>
+          <th>When</th><th>Query</th><th class="num">Returned</th><th class="num">New</th>
+          <th class="num">Duplicate</th><th>Result</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ═════════════════════════════════════════════════════════ RESULTS ═══ -->
+<section class="panel stack" id="panel-results" role="tabpanel" aria-labelledby="tab-results" hidden>
+
+  <div class="card">
+    <div class="card__body card__body--flush">
+      <div class="stats" id="statsRow">
+        <div class="stat"><div class="stat__value" id="statArticles">0</div><div class="stat__label">Articles stored</div></div>
+        <div class="stat"><div class="stat__value" id="statPublications">0</div><div class="stat__label">Publications</div></div>
+        <div class="stat"><div class="stat__value" id="statQueries">0</div><div class="stat__label">Searches run</div></div>
+        <div class="stat"><div class="stat__value" id="statEarliest">—</div><div class="stat__label">Earliest date</div></div>
+        <div class="stat"><div class="stat__value" id="statLatest">—</div><div class="stat__label">Latest date</div></div>
+        <div class="stat"><div class="stat__value" id="statSize">—</div><div class="stat__label">Database size</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">📄 Stored articles</div>
+      <div class="card__actions">
+        <button class="btn btn--sm" id="selectAllBtn" type="button">Select all shown</button>
+        <button class="btn btn--sm btn--ghost" id="selectNoneBtn" type="button">Clear selection</button>
+        <button class="btn btn--sm btn--danger" id="deleteSelectedBtn" type="button" disabled>Delete selected</button>
+      </div>
+    </div>
+    <div class="card__body">
+      <div class="grid grid--4">
+        <div class="field field--wide">
+          <label class="label" for="filterText">Filter</label>
+          <input type="search" id="filterText" placeholder="Filter title, summary, publication, author…">
+        </div>
+        <div class="field">
+          <label class="label" for="filterPublication">Publication</label>
+          <select id="filterPublication"><option value="">All publications</option></select>
+        </div>
+        <div class="field">
+          <label class="label" for="filterQuery">From search</label>
+          <select id="filterQuery"><option value="">All searches</option></select>
+        </div>
+        <div class="field">
+          <label class="label" for="filterFrom">Date from</label>
+          <input type="date" id="filterFrom">
+        </div>
+        <div class="field">
+          <label class="label" for="filterTo">Date to</label>
+          <input type="date" id="filterTo">
+        </div>
+      </div>
+    </div>
+    <div class="card__body card__body--flush">
+      <div class="tablewrap"><table class="data" id="articlesTable">
+        <thead><tr>
+          <th class="check"><input type="checkbox" id="headCheck" aria-label="Select all rows on this page"></th>
+          <th class="sortable" data-sort="title">Title <span class="arrow">↕</span></th>
+          <th class="sortable" data-sort="publication">Publication <span class="arrow">↕</span></th>
+          <th class="sortable" data-sort="date">Date <span class="arrow">↕</span></th>
+          <th class="sortable" data-sort="author">Author <span class="arrow">↕</span></th>
+          <th>Summary</th>
+          <th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="pager">
+        <span id="pagerCount">No articles yet</span>
+        <span class="pager__spacer"></span>
+        <label class="nowrap">Rows
+          <select id="pageSizeSel" style="width:auto;display:inline-block;margin-left:5px">
+            <option>25</option><option selected>50</option><option>100</option><option>250</option>
+          </select>
+        </label>
+        <button class="btn btn--sm" id="prevPageBtn" type="button">‹ Prev</button>
+        <span id="pagerPage" class="nowrap">Page 1</span>
+        <button class="btn btn--sm" id="nextPageBtn" type="button">Next ›</button>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ════════════════════════════════════════════════════════ DATABASE ═══ -->
+<section class="panel stack" id="panel-database" role="tabpanel" aria-labelledby="tab-database" hidden>
+
+  <div class="note note--info">
+    <span class="note__icon">🗄️</span>
+    <div class="note__body">
+      This is a genuine SQLite database, built by SQLite compiled to WebAssembly and running inside this tab.
+      It is saved to your browser's IndexedDB after every change, so it survives a reload. Download the
+      <code>.db</code> file to open it in DB Browser for SQLite, Python, R, or the companion notebook.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">💾 The database file</div>
+    </div>
+    <div class="card__body stack">
+      <div class="card__actions" style="margin-left:0">
+        <button class="btn btn--primary" id="downloadDbBtn" type="button">⬇️ Download <code>.db</code></button>
+        <button class="btn" id="importDbBtn" type="button">⬆️ Import a database</button>
+        <button class="btn" id="vacuumBtn" type="button" title="Rebuild the file to reclaim space">🧹 Compact</button>
+        <button class="btn btn--danger" id="resetDbBtn" type="button">🗑️ Erase everything</button>
+      </div>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button">
+        <strong>Drop a <code>.db</code>, <code>.sqlite</code> or <code>.json</code> file here</strong><br>
+        or click to choose one — articles are merged into what you already have
+      </div>
+      <input type="file" id="fileInput" accept=".db,.sqlite,.sqlite3,.json" class="visually-hidden">
+      <label class="checkline">
+        <input type="checkbox" id="autosave" checked>
+        <span>Save to browser storage automatically
+          <em>Turn off if you would rather work in memory only and download the file yourself. Nothing is kept after a reload when this is off.</em>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">⌨️ SQL console <small>read-only — <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run</small></div>
+      <div class="card__actions">
+        <select id="sqlSamples" style="width:auto"><option value="">Example queries…</option></select>
+        <button class="btn btn--sm btn--primary" id="runSqlBtn" type="button">▶ Run</button>
+      </div>
+    </div>
+    <div class="card__body stack">
+      <textarea id="sqlInput" rows="5" spellcheck="false">SELECT publication, COUNT(*) AS articles
+FROM articles
+GROUP BY publication
+ORDER BY articles DESC;</textarea>
+      <div id="sqlError" hidden></div>
+      <div id="sqlResultWrap" hidden>
+        <div class="card__actions" style="margin-left:0;margin-bottom:9px">
+          <span class="badge badge--ok" id="sqlRowCount"></span>
+          <button class="btn btn--sm" data-export-sql="xlsx" type="button">Excel</button>
+          <button class="btn btn--sm" data-export-sql="csv"  type="button">CSV</button>
+          <button class="btn btn--sm" data-export-sql="json" type="button">JSON</button>
+          <button class="btn btn--sm" data-export-sql="md"   type="button">Markdown</button>
+        </div>
+        <div class="tablewrap"><table class="data" id="sqlTable"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head"><div class="card__title">📐 Schema</div></div>
+    <div class="card__body"><pre id="schemaOut">—</pre></div>
+  </div>
+
+</section>
+
+<!-- ══════════════════════════════════════════════════════════ EXPORT ═══ -->
+<section class="panel stack" id="panel-export" role="tabpanel" aria-labelledby="tab-export" hidden>
+
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">1 · What to export</div>
+      <div class="card__actions"><span class="badge badge--info" id="exportCountBadge">0 rows</span></div>
+    </div>
+    <div class="card__body stack">
+      <div class="field">
+        <label class="label" for="exportScope">Rows</label>
+        <select id="exportScope">
+          <option value="all">Every article in the database</option>
+          <option value="filtered">Only articles matching the filters on the Results tab</option>
+          <option value="selected">Only the articles I ticked on the Results tab</option>
+          <option value="lastrun">Only the articles from my most recent search</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">Columns</label>
+        <div class="chiprow" id="columnChips"></div>
+        <p class="hint">
+          <button class="btn btn--sm btn--ghost" id="colsAllBtn" type="button">All</button>
+          <button class="btn btn--sm btn--ghost" id="colsCoreBtn" type="button">Core fields</button>
+        </p>
+      </div>
+      <div class="grid grid--2">
+        <div class="field">
+          <label class="label" for="exportSort">Order by</label>
+          <select id="exportSort">
+            <option value="date DESC">Date — newest first</option>
+            <option value="date ASC">Date — oldest first</option>
+            <option value="publication ASC, date DESC">Publication, then date</option>
+            <option value="title ASC">Title A→Z</option>
+            <option value="fetched_at DESC">When I collected it</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="exportFilename">File name</label>
+          <input type="text" id="exportFilename" placeholder="pressreader-articles">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head"><div class="card__title">2 · Format</div></div>
+    <div class="card__body stack">
+      <div class="grid grid--3" id="formatGrid">
+        <button class="btn btn--block" data-export="xlsx"   type="button">📊 Excel <span class="muted">.xlsx</span></button>
+        <button class="btn btn--block" data-export="csv"    type="button">📋 CSV <span class="muted">.csv</span></button>
+        <button class="btn btn--block" data-export="tsv"    type="button">📋 Tab-separated <span class="muted">.tsv</span></button>
+        <button class="btn btn--block" data-export="json"   type="button">🧩 JSON <span class="muted">.json</span></button>
+        <button class="btn btn--block" data-export="ndjson" type="button">🧩 JSON Lines <span class="muted">.ndjson</span></button>
+        <button class="btn btn--block" data-export="md"     type="button">📝 Markdown <span class="muted">.md</span></button>
+        <button class="btn btn--block" data-export="html"   type="button">🌐 HTML table <span class="muted">.html</span></button>
+        <button class="btn btn--block" data-export="ris"    type="button">🎓 RIS citations <span class="muted">.ris</span></button>
+        <button class="btn btn--block" data-export="bibtex" type="button">🎓 BibTeX <span class="muted">.bib</span></button>
+        <button class="btn btn--block" data-export="db"     type="button">🗄️ SQLite <span class="muted">.db</span></button>
+      </div>
+      <details class="disclosure">
+        <summary>Format options</summary>
+        <div class="disclosure__body stack">
+          <label class="checkline">
+            <input type="checkbox" id="optBom" checked>
+            <span>Add a UTF-8 byte-order mark to CSV/TSV
+              <em>Keeps accents and non-Latin scripts intact when the file is double-clicked into Excel on Windows.</em>
+            </span>
+          </label>
+          <label class="checkline">
+            <input type="checkbox" id="optSanitize" checked>
+            <span>Neutralise spreadsheet formula injection
+              <em>Prefixes cells beginning with <code>=</code>, <code>+</code>, <code>-</code>, <code>@</code>, tab or CR with an apostrophe so a hostile headline cannot execute as a formula.</em>
+            </span>
+          </label>
+          <label class="checkline">
+            <input type="checkbox" id="optExcelSheets" checked>
+            <span>Give the Excel workbook extra sheets
+              <em>Adds "By publication", "By month" and "Searches" summary tabs alongside the article list.</em>
+            </span>
+          </label>
+          <label class="checkline">
+            <input type="checkbox" id="optPretty" checked>
+            <span>Indent JSON for readability</span>
+          </label>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head"><div class="card__title">3 · Preview <small>first 10 rows, exactly as they will be written</small></div></div>
+    <div class="card__body card__body--flush">
+      <div class="tablewrap"><table class="data" id="previewTable"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ HELP ═══ -->
+<section class="panel stack" id="panel-help" role="tabpanel" aria-labelledby="tab-help" hidden>
+
+  <div class="card">
+    <div class="card__head"><div class="card__title">🌐 Connection <small>how requests reach PressReader</small></div></div>
+    <div class="card__body stack">
+      <div class="note note--warn">
+        <span class="note__icon">⚠️</span>
+        <div class="note__body">
+          <strong>PressReader's API does not send CORS headers, so a browser cannot call it directly.</strong>
+          We checked: <code>api.prod.pressreader.com</code> answers no preflight and returns no
+          <code>Access-Control-Allow-Origin</code>, so your browser blocks the request before it is even sent —
+          no matter how valid your key is. Nothing in this page can override that; it is a browser security rule.
+          <br><br>
+          <strong>So you need a proxy of your own</strong> — a few lines of code you deploy once, free, that
+          forwards requests and adds the missing header. Instructions are below, and the connection test will
+          confirm it works. If you would rather not deploy anything, the
+          <a href="https://colab.research.google.com/github/systemslibrarian/pressreader-news-scraper/blob/main/pressreader_api_to_sqlite.ipynb" target="_blank" rel="noopener noreferrer">companion Colab notebook</a>
+          calls the API from Python, where CORS does not apply at all — then drag the <code>.db</code> it produces
+          onto the Database tab here to use the browsing and export tools.
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="apiBase">API endpoint</label>
+        <input type="url" id="apiBase" spellcheck="false">
+        <p class="hint">Default: <code id="apiBaseDefault"></code></p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="proxyUrl">Proxy URL <span class="muted">(leave empty to call PressReader directly)</span></label>
+        <input type="url" id="proxyUrl" placeholder="https://your-worker.workers.dev" spellcheck="false">
+        <p class="hint">
+          Your request is sent to this address instead, and the proxy forwards it to PressReader.
+          <strong>Only ever use a proxy you deployed yourself</strong> — whoever runs the proxy can read your API key.
+        </p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="proxyMode">How the proxy expects the target</label>
+        <select id="proxyMode">
+          <option value="path">Append the path — <code>https://proxy/discovery/v1/search</code> (matches the Worker below)</option>
+          <option value="query">As a <code>?url=</code> parameter — <code>https://proxy/?url=&lt;encoded&gt;</code></option>
+        </select>
+      </div>
+
+      <div class="card__actions" style="margin-left:0">
+        <button class="btn btn--primary" id="testConnBtn" type="button">🔌 Test connection</button>
+        <button class="btn btn--ghost" id="resetConnBtn" type="button">Restore defaults</button>
+      </div>
+      <div id="connResult"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head"><div class="card__title">🛠️ Stand up your own proxy in about five minutes</div></div>
+    <div class="card__body stack">
+      <details class="disclosure" open>
+        <summary>Cloudflare Worker — free, recommended</summary>
+        <div class="disclosure__body stack">
+          <ol style="margin:0;padding-left:20px">
+            <li>Sign in at <a href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer">dash.cloudflare.com</a> and open <strong>Workers &amp; Pages → Create → Worker</strong>.</li>
+            <li>Name it, click <strong>Deploy</strong>, then <strong>Edit code</strong>.</li>
+            <li>Replace the sample code with the script below and click <strong>Deploy</strong> again.</li>
+            <li>Copy the <code>*.workers.dev</code> address into the <strong>Proxy URL</strong> box above.</li>
+            <li>Edit <code>ALLOWED_ORIGINS</code> in the script so only your own page can use it.</li>
+          </ol>
+          <div class="card__actions" style="margin-left:0">
+            <button class="btn btn--sm" id="copyWorkerBtn" type="button">📋 Copy the Worker script</button>
+            <a class="btn btn--sm" href="proxy/cloudflare-worker.js" download>⬇️ Download it</a>
+          </div>
+          <pre><code id="workerCode">Loading…</code></pre>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Run it on your own machine instead — no account, no signup</summary>
+        <div class="disclosure__body stack">
+          <p>
+            <code>proxy/local-proxy.py</code> is a single Python file that needs nothing but a standard
+            Python 3 install. Run <code>python3 local-proxy.py</code>, then put
+            <code>http://127.0.0.1:8787</code> in the Proxy URL box above. Your key never leaves your computer.
+          </p>
+          <p>
+            It binds to <code>127.0.0.1</code> only, so nothing else on your network can reach it, and it does
+            not log requests. It works even with this page served from GitHub Pages, because browsers treat
+            <code>localhost</code> as a secure origin. The trade-off: it has to be running each time you use the
+            app, and you cannot share it with a colleague.
+          </p>
+          <a class="btn btn--sm" href="proxy/local-proxy.py" download>⬇️ Download <code>local-proxy.py</code></a>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Other hosts — Deno Deploy, Val Town, Vercel, Netlify</summary>
+        <div class="disclosure__body">
+          <p>The same Worker code runs on all of them with a one-line wrapper. See
+          <a href="https://github.com/systemslibrarian/pressreader-news-scraper/blob/main/proxy/README.md" target="_blank" rel="noopener noreferrer"><code>proxy/README.md</code></a>
+          for each wrapper, the free-tier limits, and which is quickest if you have never deployed anything.</p>
+        </div>
+      </details>
+      <div class="note note--warn">
+        <span class="note__icon">⚠️</span>
+        <div class="note__body">
+          <strong>Do not use a public "open CORS proxy".</strong> Services like <code>cors-anywhere</code> or
+          <code>corsproxy.io</code> would receive your API key in plain text and could store or replay it.
+          A proxy you deploy yourself costs nothing and keeps the key between you and PressReader.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head"><div class="card__title">🔐 What happens to your data</div></div>
+    <div class="card__body">
+      <dl class="kv">
+        <dt>Your key</dt>
+        <dd>Held in this tab. Written to <code>localStorage</code> only if you tick "Remember this key", and removable with the Clear button. It is attached to API requests and to nothing else, and is never written into an export.</dd>
+        <dt>Your articles</dt>
+        <dd>Stored in a SQLite database inside your browser (IndexedDB). No copy is sent anywhere.</dd>
+        <dt>This page</dt>
+        <dd>Static files on GitHub Pages. No analytics, no cookies, no account, no server-side code.</dd>
+        <dt>Third-party code</dt>
+        <dd>Exactly one library loads from a public CDN: <a href="https://sql.js.org" target="_blank" rel="noopener noreferrer">sql.js</a>, which is SQLite itself compiled to WebAssembly. It runs entirely in this tab and sends nothing anywhere. Every export format — Excel included — is written by this app's own code, so no data passes through another library.</dd>
+        <dt>Clearing site data</dt>
+        <dd>Erases the database. Download the <code>.db</code> file if you want to keep it.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head"><div class="card__title">🩺 Troubleshooting</div></div>
+    <div class="card__body stack">
+      <details class="disclosure">
+        <summary>"Failed to fetch" or "Network error" the moment I search</summary>
+        <div class="disclosure__body">
+          <p>If you have no proxy configured, this is expected and is not a fault in your key — PressReader
+          sends no CORS headers, so the browser refuses the request. Set up the proxy above.</p>
+          <p>If you <em>do</em> have a proxy configured: check the address is exactly right, that the proxy is
+          deployed and awake, and that its <code>ALLOWED_ORIGINS</code> list contains this page's address
+          (<code id="thisOrigin">this origin</code>). Then run the connection test.</p>
+          <p><strong>Serving the page from <code>python -m http.server</code> does not fix this.</strong> A local
+          server changes your page's address but has nothing to do with the request to PressReader, which still
+          gets blocked. You need it to load this app from your own machine at all — ES modules will not run over
+          <code>file://</code> — but it does nothing for the API call.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>401 or 403 from the API</summary>
+        <div class="disclosure__body">
+          <p>The key was rejected. Check for a stray space or a partial paste, confirm the key is active in your
+          PressReader developer account, and confirm your plan includes the Discovery search endpoint.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>429 — too many requests</summary>
+        <div class="disclosure__body">
+          <p>You hit a rate limit. Lower "Articles to fetch", wait a few minutes, and try again. The app already
+          pauses between pages, and it stops paging as soon as the API reports no further results.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>The search works but every field is empty</summary>
+        <div class="disclosure__body">
+          <p>The API's response shape may differ from what this app expects. Turn on "Keep the raw JSON",
+          run one search, then open the Database tab and run
+          <code>SELECT raw FROM articles LIMIT 1;</code> to see exactly what came back — then tell us, or map the
+          fields yourself in <code>assets/api.js</code>.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Excel opens my CSV with mangled accents</summary>
+        <div class="disclosure__body">
+          <p>Keep "Add a UTF-8 byte-order mark" ticked, or export <code>.xlsx</code> instead — that format carries
+          its encoding internally and never suffers from this.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>My database vanished</summary>
+        <div class="disclosure__body">
+          <p>Browser storage is per-site and per-profile, and private/incognito windows discard it on close.
+          Some browsers also evict storage from sites you rarely visit. Download the <code>.db</code> file for
+          anything you want to keep, and import it again later.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Diagnostics</summary>
+        <div class="disclosure__body">
+          <button class="btn btn--sm" id="diagBtn" type="button">Show environment report</button>
+          <pre id="diagOut" hidden style="margin-top:10px"></pre>
+        </div>
+      </details>
+    </div>
+  </div>
+
+</section>
+
+</main>
+
+<footer class="sitefoot">
+  <p>
+    <strong>PressReader Collector</strong> — companion to the
+    <a href="https://github.com/systemslibrarian/pressreader-news-scraper" target="_blank" rel="noopener noreferrer">pressreader-news-scraper</a> notebook.
+    MIT licensed. For educational and research use; respect PressReader's terms of service.
+  </p>
+  <p>Built by <a href="https://github.com/systemslibrarian" target="_blank" rel="noopener noreferrer">Paul Clark</a> · Empowering libraries through data and innovation 📚⚙️</p>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Article detail -->
+<dialog id="detailDialog">
+  <div class="dialog__head">
+    <div class="dialog__title">Article</div>
+    <button class="btn btn--sm btn--ghost" id="detailClose" type="button">✕</button>
+  </div>
+  <div class="dialog__body" id="detailBody"></div>
+</dialog>
+
+<!-- Confirm -->
+<dialog id="confirmDialog">
+  <div class="dialog__head"><div class="dialog__title" id="confirmTitle">Are you sure?</div></div>
+  <div class="dialog__body" id="confirmBody"></div>
+  <div class="dialog__foot">
+    <button class="btn" id="confirmCancel" type="button">Cancel</button>
+    <button class="btn btn--danger" id="confirmOk" type="button">Confirm</button>
+  </div>
+</dialog>
+
+<script src="assets/app.js" type="module"></script>
+</body>
+</html>
