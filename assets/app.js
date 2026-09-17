@@ -675,7 +675,7 @@ function setSearching(active) {
   $('#searchBtn').replaceChildren(
     ...(active
       ? [el('span', { class: 'btn__spinner' }), document.createTextNode(' Searching…')]
-      : [document.createTextNode('🔍 Search & save to database')])
+      : [document.createTextNode('🔍 Search & save')])
   );
   if (!active) {
     $('#progressBar').style.width = '0%';

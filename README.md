@@ -36,13 +36,12 @@ through the site's restricted Cloudflare Worker to PressReader.
 - 🗄️ **A real SQLite database**, built by SQLite compiled to WebAssembly and saved to your browser's
   IndexedDB after every change. Download the `.db` any time and open it in DB Browser for SQLite,
   Python, R — or the notebook.
-- 🔍 **Full search form** — boolean queries, phrases, wildcards, `NEAR/n` proximity,
-  `category:` / `entity:` / `sentiment:` filters, date ranges, countries, languages, publication
-  CIDs, headline-vs-body scope, automatic paging, and optional title-based de-duplication that
-  reports how many syndicated copies it skipped.
+- 🔍 **Simple search first** — the main screen shows only the query, date range and search buttons.
+  Countries, languages and publication filters are under *More filters*; paging, sorting, raw JSON,
+  debugging and other technical controls are under *Advanced options*.
 - 🗓️ **Useful current-news defaults** — new and upgraded browsers start at one calendar year ago
   and sort newest first. Clear the date or choose relevance whenever you need a wider archive search.
-- 🛠️ **Key-safe search debugging** — enable *Debug this search* under *More filters* to see the
+- 🛠️ **Key-safe search debugging** — enable *Debug this search* under *Advanced options* to see the
   exact request body, page URLs, HTTP status and timing, API totals and returned titles, plus what
   the collector kept or skipped. The API key and request headers are deliberately never recorded.
 - 🧽 **Copied-headline cleanup** — invisible soft hyphens and zero-width formatting characters

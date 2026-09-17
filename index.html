@@ -99,33 +99,20 @@
   <!-- Search form -->
   <div class="card search-card">
     <div class="card__head">
-      <div class="card__title">🔍 Search the PressReader Discovery API</div>
+      <div class="card__title">🔍 Search PressReader</div>
       <div class="card__actions">
         <button class="btn btn--sm btn--ghost" id="resetSearchBtn" type="button">Reset form</button>
       </div>
     </div>
     <div class="card__body">
       <form id="searchForm" class="stack search-form" novalidate>
+        <div class="field">
+          <label class="label" for="query">Search terms</label>
+          <input type="text" id="query" value="coffee" placeholder="Enter keywords or an exact phrase" required>
+          <p class="hint">Enter keywords or an <code>"exact phrase"</code>. Formatting copied from newspaper pages is cleaned automatically.</p>
+        </div>
+
         <div class="grid grid--2">
-          <div class="field">
-            <label class="label" for="query">Search terms</label>
-            <input type="text" id="query" value="coffee" placeholder="coffee AND sustainable NOT decaf" required>
-            <p class="hint">
-              Supports <code>AND</code> / <code>OR</code> / <code>NOT</code>, brackets, an
-              <code>"exact phrase"</code>, wildcards (<code>Colo?r</code>, <code>Bro*</code>),
-              proximity (<code>Trump NEAR/5 Biden</code>) and
-              <code>category:</code> / <code>entity:</code> / <code>sentiment:POSITIVE</code>.
-              Invisible soft hyphens copied from newspaper pages are removed automatically.
-            </p>
-          </div>
-          <div class="field">
-            <label class="label" for="countries">Countries <span class="muted">(optional)</span></label>
-            <input type="text" id="countries" placeholder="US, GB, CA" spellcheck="false">
-            <p class="hint">
-              Two-letter ISO codes, comma separated — the country the <em>publication</em> comes from.
-              Leave empty to search everywhere. An unsupported code returns a 400 naming the code.
-            </p>
-          </div>
           <div class="field">
             <label class="label" for="startDate">Published from</label>
             <input type="date" id="startDate">
@@ -138,43 +125,23 @@
           </div>
         </div>
 
-        <div class="grid grid--4">
-          <div class="field">
-            <label class="label" for="wantTotal">Articles to fetch</label>
-            <input type="number" id="wantTotal" value="25" min="1" max="5000" step="1">
-            <p class="hint">Paged automatically.</p>
-          </div>
-          <div class="field">
-            <label class="label" for="pageSize">Per request</label>
-            <input type="number" id="pageSize" value="25" min="1" max="200" step="1">
-            <p class="hint">The API's <code>limit</code>.</p>
-          </div>
-          <div class="field">
-            <label class="label" for="startOffset">Start at offset</label>
-            <input type="number" id="startOffset" value="0" min="0" step="1">
-            <p class="hint">Skip the first N hits.</p>
-          </div>
-          <div class="field">
-            <label class="label" for="sortOrder">Sort</label>
-            <select id="sortOrder">
-              <option value="date" selected>Newest first</option>
-              <option value="">API default (relevance)</option>
-              <option value="relevance">Most relevant</option>
-            </select>
-          </div>
-        </div>
-
-        <label class="checkline checkline--compact">
-          <input type="checkbox" id="dedupeTitles" checked>
-          <span>De-duplicate matching titles before saving
-            <em>Keeps the first result in the selected sort order. Matching ignores capitalization and extra spaces.</em>
-          </span>
-        </label>
-
         <details class="disclosure">
           <summary>More filters</summary>
           <div class="disclosure__body stack">
             <div class="grid grid--2">
+              <div class="field">
+                <label class="label" for="countries">Countries</label>
+                <input type="text" id="countries" placeholder="US, GB, CA" spellcheck="false">
+                <p class="hint">Two-letter country codes, comma separated. Leave empty to search everywhere.</p>
+              </div>
+              <div class="field">
+                <label class="label" for="searchIn">Search in</label>
+                <select id="searchIn">
+                  <option value="">Everywhere (default)</option>
+                  <option value="header">Headlines only</option>
+                  <option value="body">Body text only</option>
+                </select>
+              </div>
               <div class="field">
                 <label class="label" for="languages">Languages</label>
                 <input type="text" id="languages" placeholder="en, fr" spellcheck="false">
@@ -190,14 +157,45 @@
                 <input type="text" id="cids" placeholder="0001, tb39" spellcheck="false">
                 <p class="hint">Four characters each, comma separated. Restricts the search to those titles.</p>
               </div>
+            </div>
+            <p class="hint">
+              <strong>Search syntax:</strong> <code>AND</code> / <code>OR</code> / <code>NOT</code>, brackets,
+              <code>"exact phrase"</code>, wildcards (<code>Colo?r</code>, <code>Bro*</code>), proximity
+              (<code>Trump NEAR/5 Biden</code>) and <code>category:</code> / <code>entity:</code> /
+              <code>sentiment:POSITIVE</code>.
+            </p>
+          </div>
+        </details>
+
+        <details class="disclosure">
+          <summary>Advanced options</summary>
+          <div class="disclosure__body stack">
+            <div class="grid grid--4">
               <div class="field">
-                <label class="label" for="searchIn">Search in</label>
-                <select id="searchIn">
-                  <option value="">Everywhere (default)</option>
-                  <option value="header">Headlines only</option>
-                  <option value="body">Body text only</option>
+                <label class="label" for="wantTotal">Articles to fetch</label>
+                <input type="number" id="wantTotal" value="25" min="1" max="5000" step="1">
+                <p class="hint">Paged automatically.</p>
+              </div>
+              <div class="field">
+                <label class="label" for="pageSize">Per request</label>
+                <input type="number" id="pageSize" value="25" min="1" max="200" step="1">
+                <p class="hint">The API's <code>limit</code>.</p>
+              </div>
+              <div class="field">
+                <label class="label" for="startOffset">Start at offset</label>
+                <input type="number" id="startOffset" value="0" min="0" step="1">
+                <p class="hint">Skip the first N hits.</p>
+              </div>
+              <div class="field">
+                <label class="label" for="sortOrder">Sort</label>
+                <select id="sortOrder">
+                  <option value="date" selected>Newest first</option>
+                  <option value="">API default (relevance)</option>
+                  <option value="relevance">Most relevant</option>
                 </select>
               </div>
+            </div>
+            <div class="grid grid--2">
               <div class="field">
                 <label class="label" for="itemTypes">Result type</label>
                 <select id="itemTypes">
@@ -211,6 +209,12 @@
                 <p class="hint">For anything this form does not expose. Must be a JSON object; it overrides the fields above where keys collide.</p>
               </div>
             </div>
+            <label class="checkline">
+              <input type="checkbox" id="dedupeTitles" checked>
+              <span>De-duplicate matching titles before saving
+                <em>Keeps the first result in the selected sort order. Matching ignores capitalization and extra spaces.</em>
+              </span>
+            </label>
             <label class="checkline">
               <input type="checkbox" id="storeRaw" checked>
               <span>Keep the raw JSON for every article
@@ -233,8 +237,8 @@
         </details>
 
         <div class="card__actions" style="margin-left:0">
-          <button class="btn btn--primary" id="searchBtn" type="submit">🔍 Search &amp; save to database</button>
-          <button class="btn" id="previewBtn" type="button" title="Fetch one page and show it without saving">👁️ Preview only</button>
+          <button class="btn btn--primary" id="searchBtn" type="submit">🔍 Search &amp; save</button>
+          <button class="btn" id="previewBtn" type="button" title="Fetch one page and show it without saving">👁️ Preview</button>
           <button class="btn btn--ghost" id="cancelBtn" type="button" hidden>Cancel</button>
         </div>
 
@@ -722,7 +726,7 @@ ORDER BY articles DESC;</textarea>
       <details class="disclosure">
         <summary>PressReader has an article, but my search does not find it</summary>
         <div class="disclosure__body">
-          <p>Open <strong>More filters</strong>, enable <strong>Debug this search</strong>, and run it again.
+          <p>Open <strong>Advanced options</strong>, enable <strong>Debug this search</strong>, and run it again.
           The report shows the exact body sent to PressReader, its reported total, every returned title,
           and anything the collector skipped. If the article is absent from <code>api.pages[].items</code>,
           the Discovery API did not return it—the collector did not remove it.</p>
