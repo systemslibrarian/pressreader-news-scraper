@@ -8,9 +8,10 @@ That means a web page — including the one in this repository — **cannot call
 Your browser blocks the request before it is sent, no matter how valid your API key is. This
 is a browser security rule; no client-side trick works around it, and none should.
 
-The fix is a **proxy you deploy yourself**: a few lines of code, running on a free host, that
-receives the request from your page, forwards it to PressReader, and adds the missing header
-to the reply.
+The published web app uses its own Cloudflare Worker at
+`https://pressreader-proxy.systemslibrarian.workers.dev`. Each visitor supplies their own
+PressReader key; the Worker forwards it only to PressReader and adds the missing CORS header.
+People publishing a fork should deploy their own copy of the Worker.
 
 > **This does not apply to the Colab notebook.** The same-origin policy is a browser rule, and
 > Python is not a browser. `pressreader_api_to_sqlite.ipynb` calls the API directly with no
@@ -54,7 +55,7 @@ unchanged in five years.
 2. Give it a name, click **Deploy**, then **Edit code**.
 3. Replace everything in the editor with [`cloudflare-worker.js`](cloudflare-worker.js) and
    **Deploy** again.
-4. **Edit `ALLOWED_ORIGINS`** in the code so only your own page can use it. If you host this
+4. **Edit `ALLOWED_ORIGIN`** in the code so only your own page can use it. If you host this
    app at `https://yourname.github.io`, that exact string is what belongs there — scheme and
    host, no trailing slash, no path.
 5. Copy the `https://….workers.dev` address into the app's **Proxy URL** box on the
@@ -82,6 +83,8 @@ enabled = false          # keep request logs off; they are not needed here
 - Your key is never logged, stored, cached, or put in a query string.
 - Failures return a fixed message rather than echoing the exception, which could contain
   request data.
+- Requests are accepted only when the `Origin` header exactly matches the configured GitHub
+  Pages origin. Missing origins, command-line requests, scripts, and other sites receive `403`.
 
 ---
 
@@ -165,17 +168,16 @@ Only reach for it if institutional policy forbids every other account.
 
 **"Could not reach the API" with a proxy configured.** Check the address character for character,
 that the Worker is deployed (open it in a browser — it should answer, not 404), and that
-`ALLOWED_ORIGINS` contains the origin the app reports on the *Setup & Help* tab.
+`ALLOWED_ORIGIN` contains the origin the app reports on the *Setup & Help* tab.
 
-**403 from your own Worker.** The `Origin` your browser sends is not in `ALLOWED_ORIGINS`. It must
+**403 from your own Worker.** The `Origin` your browser sends does not match `ALLOWED_ORIGIN`. It must
 match exactly — `https://name.github.io`, not `https://name.github.io/repo/`.
 
 **404 from your own Worker.** The path did not begin with `/discovery/`. Check the API endpoint
 setting, and that the proxy mode is **Append the path**.
 
-**It works from `curl` but not from the browser.** `curl` sends no `Origin` header, so CORS never
-applies. That is expected, and it confirms the upstream side is fine — the problem is the origin
-allowlist.
+**It returns `403` from `curl`.** That is intentional. The Worker rejects requests with no
+`Origin` header so command-line tools and scripts cannot casually consume its request quota.
 
 **`python -m http.server` does not fix CORS.** Serving the page locally changes *your page's*
 address; it has nothing to do with the request to PressReader, which is still cross-origin and
