@@ -9,7 +9,7 @@ Two ways to use it, sharing one database format:
 | --- | --- | --- |
 | Runs in | Your browser | Google Colab (Python) |
 | Install anything? | No | No |
-| Needs a proxy? | **Yes** — [CORS](#why-a-proxy-is-needed) | No |
+| Live API transport | Restricted Worker included | Direct from Python |
 | Browse, filter, run SQL | Yes | Not really |
 | Export formats | 10 | Markdown + the `.db` |
 | Best for | Collecting, exploring and exporting | Getting data with zero setup |
@@ -21,14 +21,18 @@ Databases move freely between them: run the notebook, then drag its `.db` onto t
 
 ## 🌐 The web app
 
-**→ [Open it](https://systemslibrarian.github.io/pressreader-news-scraper/)** *(once GitHub Pages
-is enabled — see [Publishing](#publishing-your-own-copy))*
+**→ [Open the live app](https://systemslibrarian.github.io/pressreader-news-scraper/)**
 
-No account, no server, no upload. Everything happens in your browser tab.
+No application account, installation or article upload. Search results and the SQLite database stay
+in your browser. For live searches, the app sends your request and your own PressReader API key
+through the site's restricted Cloudflare Worker to PressReader.
 
-- 🔑 **Your key stays yours.** Held in the tab; written to browser storage only if you tick
-  *Remember this key*. It goes to PressReader (or your own proxy) and nowhere else, and is never
-  written into an export.
+- 🔑 **Bring your own PressReader key.** It is held in the tab and written to browser storage only
+  if you select *Remember this key*. The Worker code does not log, store, cache or put it in a URL,
+  and the key is never written into an export.
+- 🛡️ **The proxy is already configured.** Visitors do not need a Cloudflare account or their own
+  Worker. The supplied Worker accepts browser requests only from `https://systemslibrarian.github.io`,
+  pins the destination to PressReader and rejects direct/script access.
 - 🗄️ **A real SQLite database**, built by SQLite compiled to WebAssembly and saved to your browser's
   IndexedDB after every change. Download the `.db` any time and open it in DB Browser for SQLite,
   Python, R — or the notebook.
@@ -36,8 +40,11 @@ No account, no server, no upload. Everything happens in your browser tab.
   `category:` / `entity:` / `sentiment:` filters, date ranges, countries, languages, publication
   CIDs, headline-vs-body scope, automatic paging, and optional title-based de-duplication that
   reports how many syndicated copies it skipped.
+- 🧹 **Two layers of de-duplication** — article-ID protection is always active; optional title
+  matching skips syndicated copies and reports the number skipped. The Results table can also hide
+  title duplicates already present without deleting the underlying records.
 - 📄 **Browse what you collected** — filter, sort, page, tick rows, inspect every field including the
-  raw JSON.
+  raw JSON. The API-key panel collapses after a key is entered to keep the search controls compact.
 - ⌨️ **A read-only SQL console** with worked examples, and the query result is exportable too.
 - 📤 **Ten export formats**, with a live preview of exactly what will be written.
 - 🌓 Light and dark themes; works on a phone.
@@ -48,6 +55,17 @@ No account, no server, no upload. Everything happens in your browser tab.
 Open the app and click **Load sample data**. Twelve realistic articles are inserted through the same
 code path a live search uses, so every tab — including all ten exports — behaves exactly as it will
 with real data. Nothing is sent to PressReader.
+
+### Title de-duplication
+
+**De-duplicate matching titles before saving** is enabled by default. Comparison is case-insensitive,
+normalises Unicode, trims the title and collapses repeated whitespace; punctuation remains significant.
+The first match in the selected PressReader sort order is kept. The app continues paging until it has
+the requested number of unique titles or the API has no more results, and reports how many copies it
+skipped.
+
+On the **Results** tab, **Hide repeated titles in this table** collapses duplicates that were already
+stored before this feature existed. It changes only the view—it does not delete database rows.
 
 ### Export formats
 
@@ -75,29 +93,49 @@ offline and no third party ever touches your data. Its output is validated again
 
 ---
 
-## Why a proxy is needed
+## The included Worker
 
 **PressReader's API does not send CORS headers.** Verified on 2026-08-25: `api.prod.pressreader.com`
 answers no preflight and returns no `Access-Control-Allow-Origin`. Your browser therefore blocks the
 request **before it is sent**, no matter how valid your key is. That is a browser security rule, and
 nothing in a web page can override it.
 
-The published web app is preconfigured to use its own Cloudflare Worker. Each visitor enters their
-own PressReader API key; the Worker forwards it only to PressReader and does not log, store, cache,
-or place it in a URL. [`proxy/README.md`](proxy/README.md) explains the design and how publishers of
-forks can deploy their own copy.
+The live app is preconfigured with:
 
-- **[`proxy/cloudflare-worker.js`](proxy/cloudflare-worker.js)** — recommended. Free, no credit card.
-  The upstream host and path prefix are hard-coded so it can never become an open proxy; only
-  `api-key`, `content-type` and `accept` are forwarded; your key is never logged or cached.
-- **[`proxy/local-proxy.py`](proxy/local-proxy.py)** — no account at all. Plain Python 3 standard
-  library, binds to `127.0.0.1` only, logs nothing. Your key never leaves your computer.
+```text
+https://pressreader-proxy.systemslibrarian.workers.dev
+```
+
+Visitors only enter their own PressReader key—there is no proxy setup step. The request path is:
+
+```text
+browser → restricted Cloudflare Worker → PressReader Discovery API
+```
+
+The Worker in [`proxy/cloudflare-worker.js`](proxy/cloudflare-worker.js):
+
+- accepts the exact browser origin `https://systemslibrarian.github.io` and rejects missing or other
+  origins with `403`;
+- pins the upstream host to `api.prod.pressreader.com` and the path to `/discovery/`;
+- forwards only `api-key`, `content-type` and `accept`;
+- returns only `content-type`, never cookies or redirect locations;
+- caps request bodies at 64 KB, times out upstream calls after 20 seconds, and disables caching;
+- contains no logging, storage, analytics, cookies, KV, Durable Objects or other persistence.
+
+Opening the Worker URL directly returns `{"error":"Origin not allowed"}`. That is the expected
+result: a direct visit has no allowed GitHub Pages origin.
+
+[`proxy/README.md`](proxy/README.md) documents the trust boundary and explains how maintainers of
+forks can deploy their own Worker. The production Worker intentionally will not serve a fork hosted
+under another GitHub account.
 
 **Never use a shared public CORS proxy** (`corsproxy.io`, `allorigins`, `cors-anywhere`…). Whoever
 runs one receives your API key in readable form. The app **refuses** to send your key to the known
 ones — it fails closed rather than warning. As it happens, none of them work for this anyway.
 
-**Don't want to deploy anything?** Use the notebook. Python is not a browser, so CORS never applies.
+The included Worker is not a cryptographic authentication mechanism: non-browser software can forge
+an `Origin` header. It is a browser-origin and casual quota-abuse control. The pinned upstream and
+path ensure that even such a caller cannot turn it into a general-purpose proxy.
 
 ---
 
@@ -169,8 +207,10 @@ with SQLite's JSON functions.
 1. Fork or clone this repository.
 2. **Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)`.**
 3. Wait a minute; your copy appears at `https://<your-username>.github.io/<repo>/`.
-4. Deploy a proxy ([`proxy/README.md`](proxy/README.md)) and add **your** Pages address to its
-   `ALLOWED_ORIGIN` setting. Change `DEFAULT_PROXY_URL` in `assets/app.js` to your Worker URL.
+4. Deploy your own Worker using [`proxy/cloudflare-worker.js`](proxy/cloudflare-worker.js).
+5. Change `ALLOWED_ORIGIN` in the Worker to `https://<your-username>.github.io`—scheme and host
+   only, with no repository path or trailing slash.
+6. Change `DEFAULT_PROXY_URL` in `assets/app.js` to your Worker URL and deploy the Worker.
 
 Running it locally needs a web server — ES modules and WebAssembly do not load over `file://`:
 
@@ -190,6 +230,7 @@ index.html                      the web app
 assets/app.js                   UI wiring
 assets/db.js                    SQLite (sql.js) + IndexedDB persistence
 assets/api.js                   Discovery API client, proxy handling, sample data
+assets/title.js                 shared title normalisation for de-duplication
 assets/export.js                CSV / JSON / Markdown / HTML / RIS / BibTeX writers
 assets/xlsx.js                  dependency-free .xlsx + ZIP writer
 assets/styles.css               design system, light and dark
@@ -208,8 +249,9 @@ WebAssembly), loaded from jsDelivr with an unpkg fallback. No analytics, no cook
 
 | Symptom | Cause |
 | --- | --- |
-| “Failed to fetch” the moment you search | No proxy configured — see [above](#why-a-proxy-is-needed) |
-| `403` from *your own* proxy | Your page's address does not match its `ALLOWED_ORIGIN` setting |
+| Worker URL shows `Origin not allowed` | Expected for a direct visit; test it from the app |
+| “Failed to fetch” during search | Worker unavailable, wrong Proxy URL/mode, or a network/content blocker |
+| App receives `403` from a Worker | The page origin does not exactly match the Worker's `ALLOWED_ORIGIN` |
 | `400` from the API | `countries` is required; check the date range and any extra JSON |
 | `401` / `403` from the API | Key rejected — check for a stray space, and that your plan covers Discovery search |
 | `429` | Rate limited; fetch fewer articles and wait |

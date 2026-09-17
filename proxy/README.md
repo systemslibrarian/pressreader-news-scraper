@@ -1,185 +1,123 @@
-# Why this folder exists
+# PressReader Worker architecture and self-hosting
 
-PressReader's Discovery API **does not send CORS headers**. Verified on 2026-08-25 against
-`api.prod.pressreader.com`: it answers no `OPTIONS` preflight and returns no
-`Access-Control-Allow-Origin` on any response.
+PressReader's Discovery API does not return the CORS headers required by a browser. The published
+web app therefore sends live API requests through one narrowly restricted Cloudflare Worker:
 
-That means a web page — including the one in this repository — **cannot call it directly**.
-Your browser blocks the request before it is sent, no matter how valid your API key is. This
-is a browser security rule; no client-side trick works around it, and none should.
+```text
+https://pressreader-proxy.systemslibrarian.workers.dev
+```
 
-The published web app uses its own Cloudflare Worker at
-`https://pressreader-proxy.systemslibrarian.workers.dev`. Each visitor supplies their own
-PressReader key; the Worker forwards it only to PressReader and adds the missing CORS header.
-People publishing a fork should deploy their own copy of the Worker.
+Each visitor supplies their own PressReader API key. Visitors to the published app do **not** need
+to deploy anything or create a Cloudflare account.
 
-> **This does not apply to the Colab notebook.** The same-origin policy is a browser rule, and
-> Python is not a browser. `pressreader_api_to_sqlite.ipynb` calls the API directly with no
-> proxy involved.
+The Colab notebook does not use the Worker. Python is not subject to browser CORS rules and calls
+PressReader directly.
 
----
+## Trust boundary
 
-## What the proxy must *not* be
+A proxy necessarily receives the API key in readable form before forwarding it. TLS protects the
+connections, not the endpoint itself. The checked-in Worker code contains no logging, analytics,
+storage, cache writes, KV, Durable Objects or cookies. It sends the key only in the upstream request
+to PressReader and never places it in a URL.
 
-**Never use a shared public CORS proxy** — `corsproxy.io`, `api.allorigins.win`,
-`cors-anywhere.herokuapp.com`, `thingproxy` and friends.
+The Worker is designed to minimise both exposure and quota abuse:
 
-A CORS proxy is a deliberate man-in-the-middle. Whoever operates it receives your `api-key`
-header **in readable form** on their server; TLS protects the wire, not the endpoint. They can
-log it, keep it, or have it breached or subpoenaed. You cannot audit that, and you cannot
-un-leak a key — you can only rotate it. An intermediary can also alter the response on its way
-back, which would quietly corrupt a research dataset.
-
-As it happens, none of them work for this anyway. Probed on 2026-08-25 with the exact preflight
-this app sends:
-
-| Service | Result |
+| Control | Behaviour |
 | --- | --- |
-| `corsproxy.io` | `403` on preflight from a `github.io` origin |
-| `api.allorigins.win` | no `OPTIONS` handler at all — a custom header is impossible |
-| `thingproxy.freeboard.io` | connection failure; the service is dead |
-| `cors-anywhere.herokuapp.com` | `403` → requires a manual per-browser opt-in at `/corsdemo` |
+| Browser origin | Only `https://systemslibrarian.github.io` is accepted |
+| Missing/wrong origin | Rejected with `403` before any upstream request |
+| Upstream host | Hard-coded to `api.prod.pressreader.com` |
+| Allowed path | `/discovery/` only; malformed and traversal paths are rejected |
+| Allowed methods | `GET`, `POST`, `OPTIONS` |
+| Request headers | Only `api-key`, `content-type`, `accept` |
+| Response headers | Only `content-type` plus the Worker's CORS headers |
+| Request body | Maximum 64 KB |
+| Upstream timeout | 20 seconds |
+| Redirects | Rejected rather than exposing a `Location` target |
+| Caching | Disabled with `cache-control: no-store` |
 
-The app refuses to send your key to any of these hosts. That is deliberate: a warning label
-loses to a working button at 4:55 pm, so it fails closed instead.
+An origin check is not cryptographic authentication: non-browser software can forge an `Origin`
+header. It blocks other browser sites and casual direct/script use. The pinned host and path still
+prevent the Worker from becoming a general-purpose proxy.
 
----
+GitHub Pages origins contain only the scheme and host. They do not contain the repository path, so
+`https://systemslibrarian.github.io/pressreader-news-scraper/` sends this origin:
 
-## Option 1 — Cloudflare Worker (recommended)
+```text
+https://systemslibrarian.github.io
+```
 
-Free, no credit card, ~100,000 requests a day, and the most likely of these to still work
-unchanged in five years.
+## Expected production behaviour
 
-1. Sign in at [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages** →
-   **Create** → **Worker**.
-2. Give it a name, click **Deploy**, then **Edit code**.
-3. Replace everything in the editor with [`cloudflare-worker.js`](cloudflare-worker.js) and
-   **Deploy** again.
-4. **Edit `ALLOWED_ORIGIN`** in the code so only your own page can use it. If you host this
-   app at `https://yourname.github.io`, that exact string is what belongs there — scheme and
-   host, no trailing slash, no path.
-5. Copy the `https://….workers.dev` address into the app's **Proxy URL** box on the
-   *Setup & Help* tab, leave the mode as **Append the path**, and click **Test connection**.
+- Opening the bare Worker URL directly returns `403` and `{"error":"Origin not allowed"}`.
+- An `OPTIONS` preflight from the allowed GitHub Pages origin returns `204`.
+- A live request from the app is forwarded only when its path begins with `/discovery/`.
+- The app's **Test connection** action confirms both Worker reachability and API-key acceptance.
 
-Deploying with `wrangler` instead? Put the file at `src/index.js` and use:
+Do not diagnose a direct `403` as a failure. Direct browser navigation does not carry the app's
+origin and is intentionally refused.
+
+## Deploying a Worker for a fork
+
+The production Worker will not serve a fork under another GitHub account. Fork maintainers should:
+
+1. Sign in to [Cloudflare](https://dash.cloudflare.com), open **Workers & Pages**, and create a
+   Worker.
+2. Replace the sample code with [`cloudflare-worker.js`](cloudflare-worker.js).
+3. Change `ALLOWED_ORIGIN` to the fork's GitHub Pages origin, for example:
+
+   ```js
+   const ALLOWED_ORIGIN = "https://yourname.github.io";
+   ```
+
+   Do not add a repository path or trailing slash.
+4. Deploy the Worker.
+5. Change `DEFAULT_PROXY_URL` in `../assets/app.js` to the new `*.workers.dev` address.
+6. Leave the app's proxy mode as **Append the path**, then use **Test connection**.
+
+For a Wrangler deployment, use the Worker file as `src/index.js` with a configuration such as:
 
 ```toml
-name = "pressreader-cors-proxy"
+name = "pressreader-proxy"
 main = "src/index.js"
-compatibility_date = "2026-08-25"
+compatibility_date = "2026-09-17"
 
 [observability]
-enabled = false          # keep request logs off; they are not needed here
+enabled = false
 ```
 
-### What the Worker does and does not do
+## Local development
 
-- The upstream host is **hard-coded**, and only the `/discovery/` path prefix is forwarded, so
-  it cannot be turned into an open proxy for anything else.
-- Only `api-key`, `content-type` and `accept` go upstream. No cookies, no `Authorization`, no
-  `Referer`.
-- Only `content-type` comes back. `set-cookie` and everything else is dropped.
-- Bodies are capped at 64 KB and upstream requests time out after 20 seconds.
-- Your key is never logged, stored, cached, or put in a query string.
-- Failures return a fixed message rather than echoing the exception, which could contain
-  request data.
-- Requests are accepted only when the `Origin` header exactly matches the configured GitHub
-  Pages origin. Missing origins, command-line requests, scripts, and other sites receive `403`.
-
----
-
-## Option 2 — run it on your own machine
-
-[`local-proxy.py`](local-proxy.py) needs nothing but a standard Python 3 install:
+The production Worker deliberately rejects localhost. To develop locally, run the included local
+proxy and point the app to it:
 
 ```bash
-python3 local-proxy.py
-# Local PressReader proxy on http://127.0.0.1:8787  (Ctrl-C to stop)
+python3 proxy/local-proxy.py
+python3 -m http.server 8000
 ```
 
-Then set **Proxy URL** to `http://127.0.0.1:8787`.
+Then open `http://localhost:8000` and set **Proxy URL** to `http://127.0.0.1:8787`. Modern browser
+private-network protections can block a public HTTPS page from reaching a loopback service, so run
+both the app and the proxy locally for this configuration.
 
-This is the strongest privacy position available: no account, no third party, and the key never
-leaves your computer. It binds to `127.0.0.1` only — nothing else on your network can reach it —
-and it does not log requests.
+## Never use an unrelated public CORS proxy
 
-It works even with the app served from GitHub Pages, because browsers treat `localhost` as a
-secure origin and allow an HTTPS page to reach it. Edit `ALLOWED_ORIGINS` in the file to include
-the address you load the app from.
-
-The trade-off: it has to be running each time, it is per-machine, and you cannot share it with a
-colleague.
-
----
-
-## Option 3 — other hosts
-
-The same handler runs anywhere with a `Request` → `Response` API. Take the `fetch` function out
-of `cloudflare-worker.js` and wrap it:
-
-**Deno Deploy** — [console.deno.com](https://console.deno.com) → Playground → paste → Deploy.
-Free tier is generous (1M requests/month).
-
-```js
-// Deploy Classic (dash.deno.com) was shut down on 2026-07-20 — use console.deno.com.
-Deno.serve(handler);
-```
-
-**Val Town** — the fastest of all, roughly two minutes: sign in, New → HTTP val, paste, done.
-Note that free vals have **public source** — fine here, since the code holds no secret.
-
-```js
-export default async function (req) { return handler(req); }
-```
-
-**Vercel** — needs a repo or the CLI, plus a `vercel.json` rewrite.
-
-```js
-export default { fetch: handler };
-```
-
-**Netlify** — needs a repo, the CLI, or a drag-and-drop deploy; put the file at
-`netlify/functions/proxy.mjs`.
-
-```js
-export default async (req) => handler(req);
-export const config = { path: '/discovery/*' };
-```
-
-**Google Apps Script is the one to avoid**, even though librarians know it best. It cannot read
-or set HTTP headers and cannot answer a preflight, so it cannot pass an `api-key` header at all.
-Only reach for it if institutional policy forbids every other account.
-
----
-
-## Ranked, for someone who has never deployed anything
-
-1. **Cloudflare Worker** — ~5 minutes, no card, biggest free tier, most durable. *Use this.*
-2. **Val Town** — ~2 minutes if you want it working right now. Small company; treat it as
-   convenient rather than permanent.
-3. **Local Python script** — no account at all, best privacy, but only on your own machine.
-4. **Deno Deploy** — nearly as easy as Val Town; most tutorials still show the retired UI.
-5. **Netlify / Vercel** — fine platforms, three or four times the steps.
-6. **Apps Script** — cannot do the job.
-
----
+Do not send a PressReader key through services such as `corsproxy.io`, `allorigins`,
+`cors-anywhere`, or similar open proxies. Their operators receive the key in readable form and may
+log, retain or replay it. The app blocks known public proxy hosts.
 
 ## Troubleshooting
 
-**"Could not reach the API" with a proxy configured.** Check the address character for character,
-that the Worker is deployed (open it in a browser — it should answer, not 404), and that
-`ALLOWED_ORIGIN` contains the origin the app reports on the *Setup & Help* tab.
+| Symptom | Meaning or fix |
+| --- | --- |
+| Bare Worker URL returns `403` | Expected; direct visits have no allowed origin |
+| App's preflight returns `403` | `ALLOWED_ORIGIN` does not exactly match the page origin |
+| Worker returns `404` | Requested path did not begin with `/discovery/` |
+| Worker returns `413` | Request body exceeded 64 KB |
+| Worker returns `502` | PressReader failed, timed out or redirected |
+| App reports `401`/`403` from PressReader | The supplied API key was rejected or lacks Discovery access |
+| App reports a network error | Check the Worker URL, proxy mode, deployment and local content blockers |
 
-**403 from your own Worker.** The `Origin` your browser sends does not match `ALLOWED_ORIGIN`. It must
-match exactly — `https://name.github.io`, not `https://name.github.io/repo/`.
-
-**404 from your own Worker.** The path did not begin with `/discovery/`. Check the API endpoint
-setting, and that the proxy mode is **Append the path**.
-
-**It returns `403` from `curl`.** That is intentional. The Worker rejects requests with no
-`Origin` header so command-line tools and scripts cannot casually consume its request quota.
-
-**`python -m http.server` does not fix CORS.** Serving the page locally changes *your page's*
-address; it has nothing to do with the request to PressReader, which is still cross-origin and
-still blocked. You do need it to run the app from your own machine at all — ES modules will not
-load over `file://` — but it does nothing for the API call.
+The Worker source in this repository is authoritative. If the Cloudflare editor and the repository
+differ, replace the deployed code with [`cloudflare-worker.js`](cloudflare-worker.js) and deploy it
+again.
