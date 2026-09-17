@@ -114,10 +114,11 @@ function confirmDialog(title, bodyHtml, okLabel = 'Confirm') {
 
 const SETTINGS_KEY = 'pressreader-collector:settings';
 const KEY_STORAGE = 'pressreader-collector:api-key';
+const DEFAULT_PROXY_URL = 'https://pressreader-proxy.systemslibrarian.workers.dev';
 
 const defaultSettings = () => ({
   endpoint: api.DEFAULT_ENDPOINT,
-  proxyUrl: '',
+  proxyUrl: DEFAULT_PROXY_URL,
   proxyMode: 'path',
   theme: 'auto',
   rememberKey: false,
@@ -132,6 +133,8 @@ function loadSettings() {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) Object.assign(base, JSON.parse(raw));
   } catch { /* storage unavailable or corrupt — defaults are fine */ }
+  // Migrate visitors who previously saved the old empty proxy default.
+  if (!base.proxyUrl) base.proxyUrl = DEFAULT_PROXY_URL;
   return base;
 }
 
@@ -1435,16 +1438,15 @@ function wireHelp() {
     saveSettings();
   });
   on($('#proxyUrl'), 'change', (e) => {
-    const value = e.target.value.trim();
-    if (value) {
-      try {
-        api.rejectUnsafeProxy(value);
-      } catch (err) {
-        e.target.value = state.settings.proxyUrl;
-        reportError(err, 'That proxy cannot be used');
-        return;
-      }
+    const value = e.target.value.trim() || DEFAULT_PROXY_URL;
+    try {
+      api.rejectUnsafeProxy(value);
+    } catch (err) {
+      e.target.value = state.settings.proxyUrl;
+      reportError(err, 'That proxy cannot be used');
+      return;
     }
+    e.target.value = value;
     state.settings.proxyUrl = value;
     saveSettings();
     renderConnBanner();
@@ -1458,11 +1460,11 @@ function wireHelp() {
   });
   on($('#resetConnBtn'), 'click', () => {
     state.settings.endpoint = api.DEFAULT_ENDPOINT;
-    state.settings.proxyUrl = '';
+    state.settings.proxyUrl = DEFAULT_PROXY_URL;
     state.settings.proxyMode = 'path';
     saveSettings();
     $('#apiBase').value = api.DEFAULT_ENDPOINT;
-    $('#proxyUrl').value = '';
+    $('#proxyUrl').value = DEFAULT_PROXY_URL;
     $('#proxyMode').value = 'path';
     renderConnBanner();
     toast('Connection settings restored', '', 'info', 3000);
