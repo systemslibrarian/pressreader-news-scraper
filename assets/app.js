@@ -241,6 +241,16 @@ function renderKeyBadge() {
   }
 }
 
+function syncKeyPanel({ collapse = false } = {}) {
+  const panel = $('#keyPanel');
+  if (panel) {
+    if (!state.apiKey) panel.open = true;
+    else if (collapse) panel.open = false;
+  }
+  const firstRun = $('#firstRunNote');
+  if (firstRun) firstRun.hidden = Boolean(state.apiKey);
+}
+
 /* -------------------------------------------------------- connection UI -- */
 
 function connConfig() {
@@ -544,6 +554,7 @@ function readForm() {
     sort: $('#sortOrder').value,
     keepRaw: $('#storeRaw').checked,
     overwrite: $('#updateExisting').checked,
+    dedupeByTitle: $('#dedupeTitles').checked,
   };
 }
 
@@ -566,6 +577,7 @@ function writeForm(form) {
   set('#sortOrder', form.sort);
   if (typeof form.keepRaw === 'boolean') $('#storeRaw').checked = form.keepRaw;
   if (typeof form.overwrite === 'boolean') $('#updateExisting').checked = form.overwrite;
+  if (typeof form.dedupeByTitle === 'boolean') $('#dedupeTitles').checked = form.dedupeByTitle;
 }
 
 function setSearching(active) {
@@ -584,14 +596,17 @@ function setSearching(active) {
   }
 }
 
-function setProgress(fetched, target, page, totalCount) {
+function setProgress(fetched, target, page, totalCount, titleDuplicates = 0) {
   const pct = Math.min(100, Math.round((fetched / Math.max(1, target)) * 100));
   $('#progressBar').style.width = `${pct}%`;
   const totalNote = totalCount !== null && totalCount !== undefined
     ? ` · the API reports ${fmtInt(totalCount)} matching article${totalCount === 1 ? '' : 's'} in total`
     : '';
+  const duplicateNote = titleDuplicates
+    ? ` · ${fmtInt(titleDuplicates)} repeated title${titleDuplicates === 1 ? '' : 's'} skipped`
+    : '';
   $('#progressText').textContent =
-    `Fetched ${fmtInt(fetched)} of ${fmtInt(target)} · request ${page}${totalNote}`;
+    `Collected ${fmtInt(fetched)} unique of ${fmtInt(target)} · request ${page}${duplicateNote}${totalNote}`;
 }
 
 async function runSearch({ preview = false } = {}) {
@@ -620,6 +635,7 @@ async function runSearch({ preview = false } = {}) {
         countries: form.countries, languages: form.languages, cids: form.cids,
         startDate: form.startDate, endDate: form.endDate, sort: form.sort,
         wantTotal: form.wantTotal, pageSize: form.pageSize, startOffset: form.startOffset,
+        dedupeByTitle: form.dedupeByTitle,
       }, conn.proxyUrl ? `${conn.endpoint} (via proxy)` : conn.endpoint);
     }
 
@@ -633,7 +649,8 @@ async function runSearch({ preview = false } = {}) {
       sort: form.sort,
       keepRaw: form.keepRaw,
       signal: controller.signal,
-      onProgress: ({ fetched, target, page, totalCount }) => setProgress(fetched, target, page, totalCount),
+      onProgress: ({ fetched, target, page, totalCount, titleDuplicates }) =>
+        setProgress(fetched, target, page, totalCount, titleDuplicates),
     });
 
     if (preview) {
@@ -644,15 +661,22 @@ async function runSearch({ preview = false } = {}) {
     const saved = state.store.saveArticles(result.articles, {
       searchId: runId, query: form.query || form.author,
       overwrite: form.overwrite, keepRaw: form.keepRaw,
+      dedupeByTitle: form.dedupeByTitle,
     });
+    const titleDuplicates = (result.titleDuplicates || 0) + (saved.titleDuplicates || 0);
+    const messages = [];
+    if (titleDuplicates) {
+      messages.push(`${titleDuplicates} repeated title${titleDuplicates === 1 ? '' : 's'} skipped.`);
+    }
+    if (result.truncated) {
+      messages.push(`The API reports ${result.totalCount} matches in total; ${result.rawFetched} were examined.`);
+    }
     state.store.finishSearch(runId, {
-      returned: result.articles.length,
+      returned: result.rawFetched,
       inserted: saved.inserted,
-      duplicates: saved.duplicates,
+      duplicates: saved.duplicates + titleDuplicates,
       status: 'ok',
-      message: result.truncated
-        ? `The API reports ${result.totalCount} matches in total; ${result.articles.length} were fetched.`
-        : '',
+      message: messages.join(' '),
     });
     state.lastRunId = runId;
     await state.store.save();
@@ -665,8 +689,9 @@ async function runSearch({ preview = false } = {}) {
     const bits = [`${fmtInt(saved.inserted)} new`];
     if (saved.updated) bits.push(`${fmtInt(saved.updated)} refreshed`);
     if (saved.duplicates) bits.push(`${fmtInt(saved.duplicates)} already stored`);
+    if (titleDuplicates) bits.push(`${fmtInt(titleDuplicates)} repeated title${titleDuplicates === 1 ? '' : 's'} skipped`);
     toast(
-      `Saved ${fmtInt(result.articles.length)} article${result.articles.length === 1 ? '' : 's'}`,
+      `Processed ${fmtInt(result.rawFetched)} result${result.rawFetched === 1 ? '' : 's'}`,
       bits.join(' · ') + (result.truncated ? ` · ${fmtInt(result.totalCount)} matches exist in total` : ''),
       'ok'
     );
@@ -692,7 +717,8 @@ function showPreview(result) {
   const body = $('#detailBody');
   body.replaceChildren();
   body.append(el('p', { class: 'section-note' }, [
-    `${result.articles.length} article${result.articles.length === 1 ? '' : 's'} returned` +
+    `${result.articles.length} unique article${result.articles.length === 1 ? '' : 's'} shown` +
+    (result.titleDuplicates ? ` · ${fmtInt(result.titleDuplicates)} repeated title${result.titleDuplicates === 1 ? '' : 's'} hidden` : '') +
     (result.totalCount !== null ? ` · ${fmtInt(result.totalCount)} matches in total` : '') +
     ' · nothing was saved.',
   ]));
@@ -1213,8 +1239,10 @@ function wireKey() {
   const input = $('#apiKey');
   input.value = state.apiKey;
   $('#rememberKey').checked = state.settings.rememberKey;
+  syncKeyPanel({ collapse: Boolean(state.apiKey) });
 
   on(input, 'input', () => storeApiKey(input.value.trim()));
+  on(input, 'change', () => syncKeyPanel({ collapse: Boolean(state.apiKey) }));
   on($('#rememberKey'), 'change', (e) => {
     state.settings.rememberKey = e.target.checked;
     saveSettings();
@@ -1234,6 +1262,7 @@ function wireKey() {
   on($('#clearKeyBtn'), 'click', () => {
     input.value = '';
     storeApiKey('');
+    syncKeyPanel();
     toast('Key cleared', 'Removed from this page and from browser storage.', 'ok', 3000);
   });
 }

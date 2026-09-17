@@ -46,9 +46,9 @@
   <div class="note note--info" id="firstRunNote">
     <span class="note__icon">👋</span>
     <div class="note__body">
-      <strong>Everything here runs in your browser.</strong> Your API key and your saved articles never leave
-      this device — there is no server behind this page. Data lives in a real SQLite database held in your
-      browser's storage, and you can download it as a <code>.db</code> file at any time.
+      <strong>Your collection stays in your browser.</strong> Live API requests carry your key through this
+      site's restricted Cloudflare Worker to PressReader; the Worker does not store it. Saved articles live
+      in a SQLite database in your browser, and you can download the <code>.db</code> file at any time.
       <br>
       No key yet? <button class="btn btn--sm" id="loadDemoBtn" type="button">Load sample data</button>
       to try the whole workflow first.
@@ -66,13 +66,13 @@
   </div>
 
   <!-- API key -->
-  <div class="card">
-    <div class="card__head">
+  <details class="card key-card" id="keyPanel" open>
+    <summary class="card__head">
       <div class="card__title">🔑 Your PressReader API key <small>required for live searches</small></div>
       <div class="card__actions">
         <span class="badge" id="keyBadge"><span class="dot"></span><span id="keyBadgeText">Not set</span></span>
       </div>
-    </div>
+    </summary>
     <div class="card__body stack">
       <div class="field">
         <label class="label" for="apiKey">API key</label>
@@ -94,10 +94,10 @@
         </span>
       </label>
     </div>
-  </div>
+  </details>
 
   <!-- Search form -->
-  <div class="card">
+  <div class="card search-card">
     <div class="card__head">
       <div class="card__title">🔍 Search the PressReader Discovery API</div>
       <div class="card__actions">
@@ -105,9 +105,9 @@
       </div>
     </div>
     <div class="card__body">
-      <form id="searchForm" class="stack" novalidate>
+      <form id="searchForm" class="stack search-form" novalidate>
         <div class="grid grid--2">
-          <div class="field field--wide">
+          <div class="field">
             <label class="label" for="query">Search terms</label>
             <input type="text" id="query" value="coffee" placeholder="coffee AND sustainable NOT decaf" required>
             <p class="hint">
@@ -117,7 +117,7 @@
               <code>category:</code> / <code>entity:</code> / <code>sentiment:POSITIVE</code>.
             </p>
           </div>
-          <div class="field field--wide">
+          <div class="field">
             <label class="label" for="countries">Countries <span class="muted">(optional)</span></label>
             <input type="text" id="countries" placeholder="US, GB, CA" spellcheck="false">
             <p class="hint">
@@ -162,6 +162,13 @@
             </select>
           </div>
         </div>
+
+        <label class="checkline checkline--compact">
+          <input type="checkbox" id="dedupeTitles" checked>
+          <span>De-duplicate matching titles before saving
+            <em>Keeps the first result in the selected sort order. Matching ignores capitalization and extra spaces.</em>
+          </span>
+        </label>
 
         <details class="disclosure">
           <summary>More filters</summary>

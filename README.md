@@ -34,7 +34,8 @@ No account, no server, no upload. Everything happens in your browser tab.
   Python, R — or the notebook.
 - 🔍 **Full search form** — boolean queries, phrases, wildcards, `NEAR/n` proximity,
   `category:` / `entity:` / `sentiment:` filters, date ranges, countries, languages, publication
-  CIDs, headline-vs-body scope, and automatic paging up to the number of articles you ask for.
+  CIDs, headline-vs-body scope, automatic paging, and optional title-based de-duplication that
+  reports how many syndicated copies it skipped.
 - 📄 **Browse what you collected** — filter, sort, page, tick rows, inspect every field including the
   raw JSON.
 - ⌨️ **A read-only SQL console** with worked examples, and the query result is exportable too.

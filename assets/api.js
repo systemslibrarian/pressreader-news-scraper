@@ -13,6 +13,8 @@
    `query` and `countries` are the two fields the specification marks required.
    ========================================================================== */
 
+import { titleKey } from './title.js';
+
 export const DEFAULT_ENDPOINT = 'https://api.prod.pressreader.com/discovery/v1/search';
 
 /** Hosts that must never receive an API key. See rejectUnsafeProxy(). */
@@ -315,7 +317,7 @@ export async function fetchPage({ apiKey, conn, body, offset, limit, sort, signa
  * Fetches up to `wantTotal` articles, paging as needed.
  * @param {object} options
  * @param {(p: {fetched: number, target: number, page: number, totalCount: number|null}) => void} [options.onProgress]
- * @returns {Promise<{articles: object[], totalCount: number|null, pages: number, truncated: boolean}>}
+ * @returns {Promise<{articles: object[], totalCount: number|null, pages: number, truncated: boolean, rawFetched: number, titleDuplicates: number}>}
  */
 export async function search({
   apiKey, conn, form, wantTotal = 25, pageSize = 25, startOffset = 0,
@@ -331,6 +333,10 @@ export async function search({
 
   const articles = [];
   const seen = new Set();
+  const seenTitles = new Set();
+  let rawFetched = 0;
+  let titleDuplicates = 0;
+  let truncated = false;
   let offset = Math.max(0, Number(startOffset) || 0);
   let totalCount = null;
   let pages = 0;
@@ -343,6 +349,7 @@ export async function search({
       apiKey, conn, body, offset, limit, sort, signal,
     });
     pages += 1;
+    rawFetched += items.length;
 
     if (Number.isFinite(Number(meta?.totalCount))) totalCount = Number(meta.totalCount);
 
@@ -350,15 +357,30 @@ export async function search({
       const row = normaliseItem(item, { query: body.query || body.author || '', keepRaw });
       if (seen.has(row.id)) continue;      // the API can repeat an item across pages
       seen.add(row.id);
+      if (form.dedupeByTitle) {
+        const key = titleKey(row.title);
+        if (key && seenTitles.has(key)) {
+          titleDuplicates += 1;
+          continue;
+        }
+        if (key) seenTitles.add(key);
+      }
       articles.push(row);
     }
 
-    onProgress?.({ fetched: articles.length, target, page: pages, totalCount });
+    onProgress?.({
+      fetched: articles.length, target, page: pages, totalCount, titleDuplicates,
+    });
 
-    if (!items.length) break;                                  // nothing more to give
-    if (items.length < limit) break;                           // last partial page
-    if (totalCount !== null && offset + items.length >= totalCount) break;
+    const reachedEnd = !items.length || items.length < limit ||
+      (totalCount !== null && offset + items.length >= totalCount);
+    if (reachedEnd) break;
     offset += items.length;
+
+    if (articles.length >= target) {
+      truncated = totalCount !== null && offset < totalCount;
+      break;
+    }
 
     if (articles.length < target && pauseMs) {
       await new Promise((resolve) => setTimeout(resolve, pauseMs));
@@ -369,7 +391,9 @@ export async function search({
     articles,
     totalCount,
     pages,
-    truncated: totalCount !== null && totalCount > articles.length,
+    truncated,
+    rawFetched,
+    titleDuplicates,
   };
 }
 

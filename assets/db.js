@@ -2,6 +2,8 @@
    db.js — SQLite in the browser (sql.js / WebAssembly) + IndexedDB persistence
    ========================================================================== */
 
+import { titleKey } from './title.js';
+
 /* sql.js is loaded from a CDN. Several are tried in order so a single CDN
    outage does not take the page down. Each entry must expose both
    sql-wasm.js and sql-wasm.wasm under the same directory. */
@@ -443,11 +445,25 @@ export class Store {
    * an article was *first* seen, so refreshing an existing row updates its
    * content but leaves those alone.
    *
-   * @returns {{inserted: number, duplicates: number, updated: number}}
+   * @returns {{inserted: number, duplicates: number, titleDuplicates: number, updated: number}}
    */
-  saveArticles(articles, { searchId = null, query = '', overwrite = false, keepRaw = true } = {}) {
-    let inserted = 0, duplicates = 0, updated = 0;
+  saveArticles(articles, {
+    searchId = null, query = '', overwrite = false, keepRaw = true,
+    dedupeByTitle = false,
+  } = {}) {
+    let inserted = 0, duplicates = 0, titleDuplicates = 0, updated = 0;
     const fetchedAt = new Date().toISOString();
+
+    // Preserve the earliest stored row as the canonical copy for a title.
+    // This is deliberately in JavaScript so title normalisation is identical
+    // to the in-search rule and is not dependent on SQLite collation details.
+    const storedTitles = new Map();
+    if (dedupeByTitle) {
+      for (const row of this.all('SELECT id, title FROM articles ORDER BY rowid')) {
+        const key = titleKey(row.title);
+        if (key && !storedTitles.has(key)) storedTitles.set(key, row.id);
+      }
+    }
 
     const placeholders = INSERT_COLS.map(() => '?').join(', ');
     const exists = this.db.prepare('SELECT 1 FROM articles WHERE id = ?');
@@ -477,9 +493,17 @@ export class Store {
         const already = exists.step();
         exists.reset();
 
-        if (!already) {
+        const key = dedupeByTitle ? titleKey(article.title) : '';
+        const sameTitleId = key ? storedTitles.get(key) : null;
+
+        if (!already && sameTitleId !== undefined && sameTitleId !== null) {
+          titleDuplicates += 1;
+          if (searchId != null) link.run([sameTitleId, searchId, i]);
+          return;
+        } else if (!already) {
           insert.run([...INSERT_COLS.map((col) => valueFor(article, col)), searchId]);
           inserted += 1;
+          if (key) storedTitles.set(key, id);
         } else if (overwrite) {
           update.run([...CONTENT_COLS.map((col) => valueFor(article, col)), id]);
           updated += 1;
@@ -501,7 +525,7 @@ export class Store {
     }
 
     this.touch();
-    return { inserted, duplicates, updated };
+    return { inserted, duplicates, titleDuplicates, updated };
   }
 
   deleteArticles(ids) {

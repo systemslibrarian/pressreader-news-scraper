@@ -268,6 +268,26 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 22px 20px 96px; }
 .card__body { padding: 18px; }
 .card__body--flush { padding: 0; }
 
+.key-card > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.key-card > summary::-webkit-details-marker { display: none; }
+.key-card > summary::after {
+  content: "Edit ▾";
+  color: var(--ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.key-card[open] > summary::after { content: "Hide ▴"; }
+.key-card:not([open]) > summary { border-bottom: 0; }
+
+.search-card .card__body { padding: 14px 18px 16px; }
+.search-form { gap: 13px; }
+.search-form .grid { gap: 10px 16px; }
+.search-form .hint { margin: 0; }
+
 .section-note {
   font-size: 13px;
   color: var(--ink-soft);
@@ -325,6 +345,7 @@ textarea { resize: vertical; min-height: 84px; font-family: var(--font-mono); fo
 .checkline input { margin: 3px 0 0; accent-color: var(--accent); width: 15px; height: 15px; flex: none; }
 .checkline span { min-width: 0; }
 .checkline em { display: block; font-style: normal; color: var(--ink-faint); font-size: 12px; }
+.checkline--compact { padding: 1px 0; }
 
 .inputgroup { display: flex; gap: 8px; align-items: stretch; }
 .inputgroup > input { flex: 1; min-width: 0; }
