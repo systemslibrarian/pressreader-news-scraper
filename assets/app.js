@@ -1300,7 +1300,7 @@ async function loadWorkerSource() {
     box.textContent =
       'Could not load proxy/cloudflare-worker.js from this site.\n' +
       'Open it in the repository instead:\n' +
-      'https://github.com/systemslibrarian/pressreader-news-scraper/blob/main/proxy/cloudflare-worker.js';
+      'https://github.com/systemslibrarian/pressreader-collector/blob/main/proxy/cloudflare-worker.js';
   }
 }
 

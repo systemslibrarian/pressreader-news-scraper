@@ -554,7 +554,7 @@ ORDER BY articles DESC;</textarea>
           <strong>This published app is already configured with its own restricted proxy.</strong> Each visitor
           uses their own PressReader API key. The connection test below confirms that the proxy and key work.
           If you would rather not send the key through this site's Worker, the
-          <a href="https://colab.research.google.com/github/systemslibrarian/pressreader-news-scraper/blob/main/pressreader_api_to_sqlite.ipynb" target="_blank" rel="noopener noreferrer">companion Colab notebook</a>
+          <a href="https://colab.research.google.com/github/systemslibrarian/pressreader-collector/blob/main/pressreader_collector.ipynb" target="_blank" rel="noopener noreferrer">companion Colab notebook</a>
           calls the API from Python, where CORS does not apply at all — then drag the <code>.db</code> it produces
           onto the Database tab here to use the browsing and export tools.
         </div>
@@ -645,7 +645,7 @@ ORDER BY articles DESC;</textarea>
         <summary>Other hosts — Deno Deploy, Val Town, Vercel, Netlify</summary>
         <div class="disclosure__body">
           <p>The same Worker code runs on all of them with a one-line wrapper. See
-          <a href="https://github.com/systemslibrarian/pressreader-news-scraper/blob/main/proxy/README.md" target="_blank" rel="noopener noreferrer"><code>proxy/README.md</code></a>
+          <a href="https://github.com/systemslibrarian/pressreader-collector/blob/main/proxy/README.md" target="_blank" rel="noopener noreferrer"><code>proxy/README.md</code></a>
           for each wrapper, the free-tier limits, and which is quickest if you have never deployed anything.</p>
         </div>
       </details>
@@ -770,7 +770,7 @@ ORDER BY articles DESC;</textarea>
 <footer class="sitefoot">
   <p>
     <strong>PressReader Collector</strong> — companion to the
-    <a href="https://github.com/systemslibrarian/pressreader-news-scraper" target="_blank" rel="noopener noreferrer">pressreader-news-scraper</a> notebook.
+    <a href="https://github.com/systemslibrarian/pressreader-collector" target="_blank" rel="noopener noreferrer">pressreader-collector</a> notebook.
     MIT licensed. For educational and research use; respect PressReader's terms of service.
   </p>
   <p>Built by <a href="https://github.com/systemslibrarian" target="_blank" rel="noopener noreferrer">Paul Clark</a> · Empowering libraries through data and innovation 📚⚙️</p>
@@ -797,6 +797,6 @@ ORDER BY articles DESC;</textarea>
   </div>
 </dialog>
 
-<script src="assets/app.js?v=security-20260917" type="module"></script>
+<script src="assets/app.js?v=collector-20260917" type="module"></script>
 </body>
 </html>

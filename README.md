@@ -22,7 +22,7 @@ Databases move freely between them: run the notebook, then drag its `.db` onto t
 
 ## 🌐 The web app
 
-**→ [Open the live app](https://systemslibrarian.github.io/pressreader-news-scraper/)**
+**→ [Open the live app](https://systemslibrarian.github.io/pressreader-collector/)**
 
 No application account, installation or article upload. Search results and the SQLite database stay
 in your browser. For live searches, the app sends your request and your own PressReader API key
@@ -153,9 +153,9 @@ path ensure that even such a caller cannot turn it into a general-purpose proxy.
 
 ## 📓 The Colab notebook
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/systemslibrarian/pressreader-news-scraper/blob/main/pressreader_api_to_sqlite.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/systemslibrarian/pressreader-collector/blob/main/pressreader_collector.ipynb)
 
-[`pressreader_api_to_sqlite.ipynb`](pressreader_api_to_sqlite.ipynb) searches for a keyword
+[`pressreader_collector.ipynb`](pressreader_collector.ipynb) searches for a keyword
 (`coffee` by default), stores results in `pressreader_coffee_results.db`, and prints them as
 Markdown. Duplicates are skipped via a primary key on the article ID.
 
@@ -213,7 +213,7 @@ index of citations and links; reading remains on PressReader.
 ## Publishing your own copy
 
 1. Fork or clone this repository.
-2. **Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)`.**
+2. **Settings → Pages → Source: GitHub Actions.** The included workflow publishes the site root.
 3. Wait a minute; your copy appears at `https://<your-username>.github.io/<repo>/`.
 4. Deploy your own Worker using [`proxy/cloudflare-worker.js`](proxy/cloudflare-worker.js).
 5. Change `ALLOWED_ORIGIN` in the Worker to `https://<your-username>.github.io`—scheme and host
@@ -246,7 +246,7 @@ assets/sqljs/                   vendored sql.js JavaScript, WebAssembly and lice
 proxy/cloudflare-worker.js      the recommended proxy
 proxy/local-proxy.py            a no-account alternative
 proxy/README.md                 setup for six hosting options
-pressreader_api_to_sqlite.ipynb the Colab notebook
+pressreader_collector.ipynb       the Colab notebook
 ```
 
 One third-party dependency in total: [sql.js](https://sql.js.org) 1.14.2 (SQLite 3.49.1 compiled to

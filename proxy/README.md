@@ -41,7 +41,7 @@ header. It blocks other browser sites and casual direct/script use. The pinned h
 prevent the Worker from becoming a general-purpose proxy.
 
 GitHub Pages origins contain only the scheme and host. They do not contain the repository path, so
-`https://systemslibrarian.github.io/pressreader-news-scraper/` sends this origin:
+`https://systemslibrarian.github.io/pressreader-collector/` sends this origin:
 
 ```text
 https://systemslibrarian.github.io
