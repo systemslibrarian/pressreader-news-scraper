@@ -296,6 +296,22 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 22px 20px 96px; }
 .key-card[open] > summary::after { content: "Hide ▴"; }
 .key-card:not([open]) > summary { border-bottom: 0; }
 
+.sql-card > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.sql-card > summary::-webkit-details-marker { display: none; }
+.sql-card > summary::after {
+  content: "Open ▾";
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sql-card[open] > summary::after { content: "Close ▴"; }
+.sql-card:not([open]) > summary { border-bottom: 0; }
+
 .search-card .card__body { padding: 14px 18px 16px; }
 .search-form { gap: 13px; }
 .search-form .grid { gap: 10px 16px; }
