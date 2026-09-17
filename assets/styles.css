@@ -602,6 +602,13 @@ pre {
 }
 pre code { background: none; border: 0; padding: 0; font-size: inherit; }
 
+.debug-report {
+  max-height: 520px;
+  margin-bottom: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 kbd {
   background: var(--paper-sunken);
   border: 1px solid var(--rule-strong);

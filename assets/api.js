@@ -25,13 +25,14 @@ const PUBLIC_PROXY_HOSTS = [
 ];
 
 export class ApiError extends Error {
-  constructor(message, { kind, status, detail, hint } = {}) {
+  constructor(message, { kind, status, detail, hint, diagnostics } = {}) {
     super(message);
     this.name = 'ApiError';
     this.kind = kind || 'unknown';    // network | auth | rate | request | server | config | parse
     this.status = status ?? null;
     this.detail = detail ?? '';
     this.hint = hint ?? '';
+    this.diagnostics = diagnostics ?? null;
   }
 }
 
@@ -272,6 +273,7 @@ function describeNetworkError(err, usingProxy) {
  */
 export async function fetchPage({ apiKey, conn, body, offset, limit, sort, signal }) {
   const url = buildRequestUrl(conn, { offset, limit, sort });
+  const started = globalThis.performance?.now?.() ?? Date.now();
 
   const headers = { 'Content-Type': 'application/json' };
   if (apiKey) headers['api-key'] = apiKey;
@@ -288,13 +290,24 @@ export async function fetchPage({ apiKey, conn, body, offset, limit, sort, signa
       referrerPolicy: 'no-referrer',
     });
   } catch (err) {
-    throw describeNetworkError(err, Boolean(conn.proxyUrl));
+    const described = describeNetworkError(err, Boolean(conn.proxyUrl));
+    described.diagnostics = {
+      url, offset, limit, sort: sort || '(API default)',
+      durationMs: Math.round((globalThis.performance?.now?.() ?? Date.now()) - started),
+      status: null,
+    };
+    throw described;
   }
 
   if (!response.ok) {
     let text = '';
     try { text = await response.text(); } catch { /* body may be unreadable */ }
-    throw describeHttpError(response.status, text);
+    const described = describeHttpError(response.status, text);
+    described.diagnostics = {
+      url, offset, limit, sort: sort || '(API default)', status: response.status,
+      durationMs: Math.round((globalThis.performance?.now?.() ?? Date.now()) - started),
+    };
+    throw described;
   }
 
   let payload;
@@ -304,13 +317,25 @@ export async function fetchPage({ apiKey, conn, body, offset, limit, sort, signa
     throw new ApiError('The API replied with something that is not JSON.', {
       kind: 'parse', detail: err.message,
       hint: 'If you use a proxy, it may be returning an error page rather than forwarding the API response.',
+      diagnostics: {
+        url, offset, limit, sort: sort || '(API default)', status: response.status,
+        durationMs: Math.round((globalThis.performance?.now?.() ?? Date.now()) - started),
+      },
     });
   }
 
   const items = Array.isArray(payload?.items) ? payload.items
     : Array.isArray(payload) ? payload
     : [];
-  return { items, meta: payload?.meta || {}, raw: payload };
+  return {
+    items,
+    meta: payload?.meta || {},
+    raw: payload,
+    diagnostics: {
+      url, offset, limit, sort: sort || '(API default)', status: response.status,
+      durationMs: Math.round((globalThis.performance?.now?.() ?? Date.now()) - started),
+    },
+  };
 }
 
 /**
@@ -321,7 +346,7 @@ export async function fetchPage({ apiKey, conn, body, offset, limit, sort, signa
  */
 export async function search({
   apiKey, conn, form, wantTotal = 25, pageSize = 25, startOffset = 0,
-  sort = '', keepRaw = true, signal, onProgress, pauseMs = 350,
+  sort = '', keepRaw = true, signal, onProgress, pauseMs = 350, debug = false,
 }) {
   const body = buildRequestBody(form);
   if (!body.query && !body.author) {
@@ -340,16 +365,34 @@ export async function search({
   let offset = Math.max(0, Number(startOffset) || 0);
   let totalCount = null;
   let pages = 0;
+  const debugPages = [];
 
   while (articles.length < target) {
     if (signal?.aborted) throw new ApiError('The search was cancelled.', { kind: 'network' });
 
     const limit = Math.min(size, target - articles.length);
-    const { items, meta } = await fetchPage({
+    const { items, meta, diagnostics } = await fetchPage({
       apiKey, conn, body, offset, limit, sort, signal,
     });
     pages += 1;
     rawFetched += items.length;
+
+    if (debug) {
+      debugPages.push({
+        ...diagnostics,
+        apiTotalCount: Number.isFinite(Number(meta?.totalCount)) ? Number(meta.totalCount) : null,
+        itemCount: items.length,
+        items: items.map((item) => ({
+          id: str(item?.article?.id ?? item?.id),
+          title: str(item?.article?.title),
+          publication: str(item?.publication?.title),
+          publicationCid: str(item?.publication?.cid),
+          date: str(item?.issue?.date),
+          page: Number.isFinite(Number(item?.page?.number)) ? Number(item.page.number) : null,
+          url: str(item?.article?.url),
+        })),
+      });
+    }
 
     if (Number.isFinite(Number(meta?.totalCount))) totalCount = Number(meta.totalCount);
 
@@ -394,6 +437,7 @@ export async function search({
     truncated,
     rawFetched,
     titleDuplicates,
+    debugPages,
   };
 }
 

@@ -40,6 +40,11 @@ through the site's restricted Cloudflare Worker to PressReader.
   `category:` / `entity:` / `sentiment:` filters, date ranges, countries, languages, publication
   CIDs, headline-vs-body scope, automatic paging, and optional title-based de-duplication that
   reports how many syndicated copies it skipped.
+- 🗓️ **Useful current-news defaults** — new and upgraded browsers start at one calendar year ago
+  and sort newest first. Clear the date or choose relevance whenever you need a wider archive search.
+- 🛠️ **Key-safe search debugging** — enable *Debug this search* under *More filters* to see the
+  exact request body, page URLs, HTTP status and timing, API totals and returned titles, plus what
+  the collector kept or skipped. The API key and request headers are deliberately never recorded.
 - 🧹 **Two layers of de-duplication** — article-ID protection is always active; optional title
   matching skips syndicated copies and reports the number skipped. The Results table can also hide
   title duplicates already present without deleting the underlying records.
@@ -256,6 +261,7 @@ WebAssembly), loaded from jsDelivr with an unpkg fallback. No analytics, no cook
 | `400` from the API | `countries` is required; check the date range and any extra JSON |
 | `401` / `403` from the API | Key rejected — check for a stray space, and that your plan covers Discovery search |
 | `429` | Rate limited; fetch fewer articles and wait |
+| A known article is missing | Enable *Debug this search*. If it is absent from `api.pages[].items`, PressReader did not return it; the collector did not discard it |
 | Excel mangles accents in a CSV | Keep the UTF-8 BOM ticked, or export `.xlsx` instead |
 | The database vanished | Browser storage is per-profile and private windows discard it. Download the `.db` for anything you want to keep |
 

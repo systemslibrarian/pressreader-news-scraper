@@ -156,8 +156,8 @@
           <div class="field">
             <label class="label" for="sortOrder">Sort</label>
             <select id="sortOrder">
+              <option value="date" selected>Newest first</option>
               <option value="">API default (relevance)</option>
-              <option value="date">Newest first</option>
               <option value="relevance">Most relevant</option>
             </select>
           </div>
@@ -222,6 +222,12 @@
                 <em>Off: duplicates are skipped and counted. On: existing rows are overwritten with the newer copy.</em>
               </span>
             </label>
+            <label class="checkline">
+              <input type="checkbox" id="debugMode">
+              <span>Debug this search
+                <em>Shows the exact request body, page-by-page API counts and returned titles so you can see whether PressReader returned a missing article. The API key is never included.</em>
+              </span>
+            </label>
           </div>
         </details>
 
@@ -236,6 +242,20 @@
           <p class="hint" id="progressText" style="margin-top:7px" aria-live="polite"></p>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="card" id="searchDebugCard" hidden>
+    <div class="card__head">
+      <div class="card__title">🛠️ Search debug report <small>API key omitted</small></div>
+      <div class="card__actions">
+        <button class="btn btn--sm" id="copySearchDebugBtn" type="button">Copy report</button>
+        <button class="btn btn--sm btn--ghost" id="clearSearchDebugBtn" type="button">Clear</button>
+      </div>
+    </div>
+    <div class="card__body">
+      <p class="hint" style="margin-top:0">This report stays in this page only unless you copy it. It records the request URL and body, HTTP timing, API result counts, returned titles, and anything the collector skipped.</p>
+      <pre class="debug-report" id="searchDebugOutput" aria-live="polite"></pre>
     </div>
   </div>
 
@@ -695,6 +715,18 @@ ORDER BY articles DESC;</textarea>
         <div class="disclosure__body">
           <p>You hit a rate limit. Lower "Articles to fetch", wait a few minutes, and try again. The app already
           pauses between pages, and it stops paging as soon as the API reports no further results.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>PressReader has an article, but my search does not find it</summary>
+        <div class="disclosure__body">
+          <p>Open <strong>More filters</strong>, enable <strong>Debug this search</strong>, and run it again.
+          The report shows the exact body sent to PressReader, its reported total, every returned title,
+          and anything the collector skipped. If the article is absent from <code>api.pages[].items</code>,
+          the Discovery API did not return it—the collector did not remove it.</p>
+          <p>Try the headline as an exact quoted phrase, <strong>Headlines only</strong>, country
+          <code>US</code>, and a narrow date range. PressReader's reading site and Discovery search index
+          can behave differently.</p>
         </div>
       </details>
       <details class="disclosure">

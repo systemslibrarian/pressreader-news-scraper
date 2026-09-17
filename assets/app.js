@@ -58,6 +58,20 @@ function truncate(text, max) {
   return s.length > max ? s.slice(0, max - 1) + '…' : s;
 }
 
+function oneYearAgoIso(now = new Date()) {
+  const year = now.getFullYear() - 1;
+  const month = now.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const day = Math.min(now.getDate(), lastDay);
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+const defaultSearchForm = () => ({
+  startDate: oneYearAgoIso(),
+  sort: 'date',
+  debugMode: false,
+});
+
 /* ---------------------------------------------------------------- toasts -- */
 
 function toast(title, message = '', kind = 'info', ms = 6000) {
@@ -116,6 +130,7 @@ function confirmDialog(title, bodyHtml, okLabel = 'Confirm') {
 const SETTINGS_KEY = 'pressreader-collector:settings';
 const KEY_STORAGE = 'pressreader-collector:api-key';
 const DEFAULT_PROXY_URL = 'https://pressreader-proxy.systemslibrarian.workers.dev';
+const SEARCH_DEFAULTS_VERSION = 1;
 
 const defaultSettings = () => ({
   endpoint: api.DEFAULT_ENDPOINT,
@@ -125,17 +140,27 @@ const defaultSettings = () => ({
   rememberKey: false,
   autosave: true,
   exportColumns: ARTICLE_COLUMNS.filter((c) => c.core).map((c) => c.key),
-  form: null,
+  form: defaultSearchForm(),
+  searchDefaultsVersion: SEARCH_DEFAULTS_VERSION,
 });
 
 function loadSettings() {
   const base = defaultSettings();
+  let saved = {};
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) Object.assign(base, JSON.parse(raw));
+    if (raw) saved = JSON.parse(raw);
+    Object.assign(base, saved);
   } catch { /* storage unavailable or corrupt — defaults are fine */ }
   // Migrate visitors who previously saved the old empty proxy default.
   if (!base.proxyUrl) base.proxyUrl = DEFAULT_PROXY_URL;
+  // Apply the new date/sort defaults once to existing browsers. Afterwards an
+  // intentionally cleared date remains cleared instead of being reinserted.
+  if (saved.searchDefaultsVersion !== SEARCH_DEFAULTS_VERSION) {
+    base.form = { ...(base.form || {}), ...defaultSearchForm() };
+    base.searchDefaultsVersion = SEARCH_DEFAULTS_VERSION;
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(base)); } catch { /* optional persistence */ }
+  }
   return base;
 }
 
@@ -589,11 +614,12 @@ function readForm() {
     keepRaw: $('#storeRaw').checked,
     overwrite: $('#updateExisting').checked,
     dedupeByTitle: $('#dedupeTitles').checked,
+    debugMode: $('#debugMode').checked,
   };
 }
 
 function writeForm(form) {
-  if (!form) return;
+  form = { ...defaultSearchForm(), ...(form || {}) };
   const set = (id, value) => { const n = $(id); if (n && value !== undefined && value !== null) n.value = value; };
   set('#query', form.query);
   set('#countries', form.countries);
@@ -612,6 +638,33 @@ function writeForm(form) {
   if (typeof form.keepRaw === 'boolean') $('#storeRaw').checked = form.keepRaw;
   if (typeof form.overwrite === 'boolean') $('#updateExisting').checked = form.overwrite;
   if (typeof form.dedupeByTitle === 'boolean') $('#dedupeTitles').checked = form.dedupeByTitle;
+  if (typeof form.debugMode === 'boolean') $('#debugMode').checked = form.debugMode;
+}
+
+function renderSearchDebug(report) {
+  const card = $('#searchDebugCard');
+  const out = $('#searchDebugOutput');
+  if (!card || !out) return;
+  out.textContent = JSON.stringify(report, null, 2);
+  card.hidden = false;
+}
+
+function searchDebugRequest(form, conn, preview) {
+  const limit = Math.min(form.pageSize, form.wantTotal);
+  return {
+    generatedAt: new Date().toISOString(),
+    mode: preview ? 'preview' : 'search and save',
+    privacy: 'API key deliberately omitted. Request headers are not recorded.',
+    request: {
+      method: 'POST',
+      url: api.buildRequestUrl(conn, {
+        offset: form.startOffset,
+        limit,
+        sort: form.sort,
+      }),
+      body: api.buildRequestBody(form),
+    },
+  };
 }
 
 function setSearching(active) {
@@ -662,8 +715,13 @@ async function runSearch({ preview = false } = {}) {
 
   const conn = connConfig();
   let runId = null;
+  let debugReport = null;
 
   try {
+    if (form.debugMode) {
+      debugReport = searchDebugRequest(form, conn, preview);
+      renderSearchDebug({ ...debugReport, status: 'requesting' });
+    }
     if (!preview) {
       runId = state.store.beginSearch(form.query || form.author, {
         countries: form.countries, languages: form.languages, cids: form.cids,
@@ -682,10 +740,33 @@ async function runSearch({ preview = false } = {}) {
       startOffset: form.startOffset,
       sort: form.sort,
       keepRaw: form.keepRaw,
+      debug: form.debugMode,
       signal: controller.signal,
       onProgress: ({ fetched, target, page, totalCount, titleDuplicates }) =>
         setProgress(fetched, target, page, totalCount, titleDuplicates),
     });
+
+    if (debugReport) {
+      debugReport.status = 'completed';
+      debugReport.api = {
+        reportedTotalCount: result.totalCount,
+        pagesRequested: result.pages,
+        rawItemsReturned: result.rawFetched,
+        pages: result.debugPages,
+      };
+      debugReport.collector = {
+        uniqueItemsKept: result.articles.length,
+        repeatedIdsSkipped: Math.max(0, result.rawFetched - result.articles.length - result.titleDuplicates),
+        repeatedTitlesSkipped: result.titleDuplicates,
+        titlesKept: result.articles.map((row) => ({
+          id: row.id, title: row.title, publication: row.publication, date: row.date,
+        })),
+      };
+      debugReport.conclusion = result.rawFetched === 0
+        ? 'PressReader returned no items for this request.'
+        : 'Compare api.pages[].items with collector.titlesKept. If the wanted article is absent from api.pages, PressReader did not return it; the collector did not filter it out.';
+      renderSearchDebug(debugReport);
+    }
 
     if (preview) {
       showPreview(result);
@@ -731,6 +812,23 @@ async function runSearch({ preview = false } = {}) {
     );
     if (result.articles.length) showTab('results');
   } catch (err) {
+    if (form.debugMode) {
+      debugReport ||= (() => {
+        try { return searchDebugRequest(form, conn, preview); }
+        catch { return { generatedAt: new Date().toISOString(), mode: preview ? 'preview' : 'search and save' }; }
+      })();
+      debugReport.status = controller.signal.aborted ? 'cancelled' : 'failed';
+      debugReport.failedRequest = err?.diagnostics || null;
+      debugReport.error = {
+        name: err?.name || 'Error',
+        kind: err?.kind || null,
+        status: err?.status ?? null,
+        message: err?.message || String(err),
+        detail: err?.detail || null,
+        hint: err?.hint || null,
+      };
+      renderSearchDebug(debugReport);
+    }
     if (runId !== null) {
       const cancelled = controller.signal.aborted;
       state.store.finishSearch(runId, {
@@ -1308,10 +1406,23 @@ function wireSearch() {
   on($('#cancelBtn'), 'click', () => state.controller?.abort());
   on($('#loadDemoBtn'), 'click', () => loadDemo());
   on($('#resetSearchBtn'), 'click', () => {
-    state.settings.form = null;
+    state.settings.form = defaultSearchForm();
     saveSettings();
     $('#searchForm').reset();
+    writeForm(state.settings.form);
     toast('Form reset', '', 'info', 2000);
+  });
+  on($('#copySearchDebugBtn'), 'click', async () => {
+    try {
+      await navigator.clipboard.writeText($('#searchDebugOutput').textContent);
+      toast('Debug report copied', 'The API key is not included.', 'ok', 2500);
+    } catch {
+      toast('Could not copy', 'Select the report and copy it manually.', 'warn');
+    }
+  });
+  on($('#clearSearchDebugBtn'), 'click', () => {
+    $('#searchDebugOutput').textContent = '';
+    $('#searchDebugCard').hidden = true;
   });
   on($('#clearRunsBtn'), 'click', async () => {
     const ok = await confirmDialog(
