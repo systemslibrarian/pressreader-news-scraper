@@ -402,16 +402,17 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="card__head">
-      <div class="card__title">⌨️ SQL console <small>read-only — <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run</small></div>
-      <div class="card__actions">
-        <select id="sqlSamples" style="width:auto"><option value="">Example queries…</option></select>
-        <button class="btn btn--sm btn--primary" id="runSqlBtn" type="button">▶ Run</button>
-      </div>
-    </div>
+  <details class="card sql-card">
+    <summary class="card__head">
+      <span class="card__title">⌨️ SQL console <small>advanced · read-only</small></span>
+    </summary>
     <div class="card__body stack">
       <p class="hint" style="margin-top:0"><strong>Citation index only:</strong> the database stores the seven fields confirmed in the Discovery response—title, publication, date, page, article URL, publication CID and article ID. It never stores article text or untouched API responses.</p>
+      <div class="card__actions" style="margin-left:0">
+        <select id="sqlSamples" style="width:auto"><option value="">Example queries…</option></select>
+        <button class="btn btn--sm btn--primary" id="runSqlBtn" type="button">▶ Run</button>
+        <span class="hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run</span>
+      </div>
       <textarea id="sqlInput" rows="5" spellcheck="false">SELECT publication, COUNT(*) AS articles
 FROM articles
 GROUP BY publication
@@ -428,7 +429,7 @@ ORDER BY articles DESC;</textarea>
         <div class="tablewrap"><table class="data" id="sqlTable"><thead></thead><tbody></tbody></table></div>
       </div>
     </div>
-  </div>
+  </details>
 
   <details class="disclosure">
     <summary>📐 Database schema <span class="muted">advanced</span></summary>
