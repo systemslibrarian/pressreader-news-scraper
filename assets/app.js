@@ -582,7 +582,7 @@ function renderRuns() {
 
     if (run.message && run.status !== 'ok') {
       tbody.append(el('tr', {}, [
-        el('td', { colspan: '7', class: 'muted', style: 'padding-top:0;font-size:12.5px' },
+        el('td', { colspan: '7', class: 'muted run-message' },
           [truncate(run.message, 240)]),
       ]));
     }
@@ -672,14 +672,14 @@ function setSearching(active) {
       : [document.createTextNode('🔍 Search & save')])
   );
   if (!active) {
-    $('#progressBar').style.width = '0%';
+    $('#progressBar').value = 0;
     $('#progressText').textContent = '';
   }
 }
 
 function setProgress(fetched, target, page, totalCount, titleDuplicates = 0) {
   const pct = Math.min(100, Math.round((fetched / Math.max(1, target)) * 100));
-  $('#progressBar').style.width = `${pct}%`;
+  $('#progressBar').value = pct;
   const totalNote = totalCount !== null && totalCount !== undefined
     ? ` · the API reports ${fmtInt(totalCount)} matching article${totalCount === 1 ? '' : 's'} in total`
     : '';
@@ -1012,7 +1012,7 @@ function runSql() {
       el('span', { class: 'note__icon', text: '⚠️' }),
       el('div', { class: 'note__body' }, [
         el('strong', { text: 'That query did not run' }),
-        el('div', { class: 'mono-sm', style: 'margin-top:5px' }, [err.message]),
+        el('div', { class: 'mono-sm stack-line' }, [err.message]),
       ]),
     ]));
     return;
@@ -1254,7 +1254,7 @@ async function testConnection() {
       el('span', { class: 'note__icon', text: icon }),
       el('div', { class: 'note__body' }, [
         el('strong', { text: title }),
-        ...lines.map((line) => el('div', { style: 'margin-top:5px' }, [line])),
+        ...lines.map((line) => el('div', { class: 'stack-line' }, [line])),
       ]),
     ]));
   };
@@ -1676,9 +1676,9 @@ function showBootError(err) {
         el('div', { class: 'note__body' }, [
           el('strong', { text: 'The database engine could not start' }),
           el('p', {}, [
-            'This app needs SQLite compiled to WebAssembly, which is loaded from a public CDN. ' +
-            'The most likely causes are no network connection, a content blocker, or a network that ' +
-            'blocks cdn.jsdelivr.net.',
+            'This app needs its bundled SQLite WebAssembly files. Reload once, then check whether ' +
+            'a browser extension, network filter, or incomplete site deployment blocked ' +
+            'assets/sqljs/sql-wasm.js or assets/sqljs/sql-wasm.wasm.',
           ]),
           el('pre', {}, [el('code', { text: err?.message || String(err) })]),
           el('p', {}, [

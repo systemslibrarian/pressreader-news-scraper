@@ -4,18 +4,10 @@
 
 import { titleKey } from './title.js';
 
-/* sql.js is loaded from a CDN. Several are tried in order so a single CDN
-   outage does not take the page down. Each entry must expose both
-   sql-wasm.js and sql-wasm.wasm under the same directory. */
+/* sql.js is vendored with the app. The glue script and WebAssembly binary must
+   stay together under assets/sqljs/ and must come from this exact release. */
 export const SQLJS_VERSION = '1.14.2';
-
-/* jsDelivr first: it serves the .wasm as application/wasm with
-   cross-origin-resource-policy and immutable caching. The glue script and the
-   .wasm must come from the same release, so the version is pinned. */
-const SQLJS_CDNS = [
-  `https://cdn.jsdelivr.net/npm/sql.js@${SQLJS_VERSION}/dist/`,
-  `https://unpkg.com/sql.js@${SQLJS_VERSION}/dist/`,
-];
+const SQLJS_BASE_URL = new URL('./sqljs/', import.meta.url);
 
 const IDB_NAME = 'pressreader-collector';
 const IDB_STORE = 'files';
@@ -39,31 +31,24 @@ function loadScript(src) {
 
 let sqlPromise = null;
 
-/** Resolves to the initialised sql.js module, trying each CDN in turn. */
+/** Resolves to the initialised vendored sql.js module. */
 export function loadSqlJs() {
   if (sqlPromise) return sqlPromise;
   sqlPromise = (async () => {
-    const failures = [];
-    for (const base of SQLJS_CDNS) {
-      try {
-        if (typeof globalThis.initSqlJs !== 'function') {
-          await loadScript(base + 'sql-wasm.js');
-        }
-        if (typeof globalThis.initSqlJs !== 'function') {
-          throw new Error('initSqlJs missing after load');
-        }
-        return await globalThis.initSqlJs({ locateFile: (f) => base + f });
-      } catch (err) {
-        failures.push(`${base}: ${err.message}`);
-        // A partially-initialised global would poison the next attempt.
-        if (typeof globalThis.initSqlJs === 'function') delete globalThis.initSqlJs;
+    try {
+      if (typeof globalThis.initSqlJs !== 'function') {
+        await loadScript(new URL('sql-wasm.js', SQLJS_BASE_URL).href);
       }
+      if (typeof globalThis.initSqlJs !== 'function') {
+        throw new Error('initSqlJs missing after loading the vendored script');
+      }
+      return await globalThis.initSqlJs({
+        locateFile: (filename) => new URL(filename, SQLJS_BASE_URL).href,
+      });
+    } catch (err) {
+      sqlPromise = null;
+      throw new Error(`SQLite (sql.js) could not be loaded from this site: ${err.message}`);
     }
-    sqlPromise = null;
-    throw new Error(
-      'SQLite (sql.js) could not be loaded from any CDN. Check your network ' +
-      'connection or any content blocker.\n' + failures.join('\n')
-    );
   })();
   return sqlPromise;
 }

@@ -278,6 +278,8 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 22px 20px 96px; }
 .card__title { font-size: 15px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
 .card__title small { font-weight: 400; color: var(--ink-faint); font-size: 12.5px; }
 .card__actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.actions-start { margin-left: 0; }
+.actions-spaced { margin-left: 0; margin-bottom: 9px; }
 .card__body { padding: 18px; }
 .card__body--flush { padding: 0; }
 
@@ -347,6 +349,14 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 22px 20px 96px; }
 
 .hint { font-size: 12px; color: var(--ink-faint); line-height: 1.45; }
 .hint code { font-size: 11.5px; }
+.hint-flush { margin-top: 0; }
+.hint-top { margin-top: 7px; }
+.stack-line { margin-top: 5px; }
+.run-message { padding-top: 0; font-size: 12.5px; }
+.select-inline { width: auto; display: inline-block; margin-left: 5px; }
+.select-auto { width: auto; }
+.compact-list { margin: 0; padding-left: 20px; }
+.diag-output { margin-top: 10px; }
 
 input[type="text"], input[type="password"], input[type="search"],
 input[type="number"], input[type="date"], input[type="url"], select, textarea {
@@ -670,12 +680,18 @@ details.disclosure .disclosure__body > :first-child { margin-top: 0; }
 details.disclosure .disclosure__body > :last-child { margin-bottom: 0; }
 
 .progress {
+  display: block;
+  width: 100%;
   height: 5px;
+  border: 0;
+  appearance: none;
   background: var(--paper-sunken);
   border-radius: 99px;
   overflow: hidden;
 }
-.progress__bar { height: 100%; background: var(--accent); border-radius: 99px; transition: width .2s ease-out; }
+.progress::-webkit-progress-bar { background: var(--paper-sunken); border-radius: 99px; }
+.progress::-webkit-progress-value { background: var(--accent); border-radius: 99px; transition: width .2s ease-out; }
+.progress::-moz-progress-bar { background: var(--accent); border-radius: 99px; transition: width .2s ease-out; }
 
 .dropzone {
   border: 2px dashed var(--rule-strong);

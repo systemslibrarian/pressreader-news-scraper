@@ -6,6 +6,7 @@
 <title>PressReader Collector — search, store &amp; export news articles</title>
 <meta name="description" content="A no-server web app: search PressReader with your own key, store citation metadata and links in SQLite, and export to Excel or CSV.">
 <meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' https://api.prod.pressreader.com https://*.workers.dev https://*.deno.dev https://*.val.run https://*.vercel.app https://*.netlify.app http://127.0.0.1:8787 http://localhost:8787; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <link rel="stylesheet" href="assets/styles.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%B0%3C/text%3E%3C/svg%3E">
 </head>
@@ -232,15 +233,15 @@
           </div>
         </details>
 
-        <div class="card__actions" style="margin-left:0">
+        <div class="card__actions actions-start">
           <button class="btn btn--primary" id="searchBtn" type="submit">🔍 Search &amp; save</button>
           <button class="btn" id="previewBtn" type="button" title="Fetch one page and show it without saving">👁️ Preview</button>
           <button class="btn btn--ghost" id="cancelBtn" type="button" hidden>Cancel</button>
         </div>
 
         <div id="searchProgress" hidden>
-          <div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
-          <p class="hint" id="progressText" style="margin-top:7px" aria-live="polite"></p>
+          <progress class="progress" id="progressBar" max="100" value="0"></progress>
+          <p class="hint hint-top" id="progressText" aria-live="polite"></p>
         </div>
       </form>
     </div>
@@ -255,7 +256,7 @@
       </div>
     </div>
     <div class="card__body">
-      <p class="hint" style="margin-top:0">This report stays in this page only unless you copy it. It records the request URL and body, HTTP timing, API result counts, returned titles, and anything the collector skipped.</p>
+      <p class="hint hint-flush">This report stays in this page only unless you copy it. It records the request URL and body, HTTP timing, API result counts, returned titles, and anything the collector skipped.</p>
       <pre class="debug-report" id="searchDebugOutput" aria-live="polite"></pre>
     </div>
   </div>
@@ -352,7 +353,7 @@
         <span id="pagerCount">No articles yet</span>
         <span class="pager__spacer"></span>
         <label class="nowrap">Rows
-          <select id="pageSizeSel" style="width:auto;display:inline-block;margin-left:5px">
+          <select id="pageSizeSel" class="select-inline">
             <option>25</option><option selected>50</option><option>100</option><option>250</option>
           </select>
         </label>
@@ -382,7 +383,7 @@
       <div class="card__title">💾 The database file</div>
     </div>
     <div class="card__body stack">
-      <div class="card__actions" style="margin-left:0">
+      <div class="card__actions actions-start">
         <button class="btn btn--primary" id="downloadDbBtn" type="button">⬇️ Download <code>.db</code></button>
         <button class="btn" id="importDbBtn" type="button">⬆️ Import a database</button>
         <button class="btn" id="vacuumBtn" type="button" title="Rebuild the file to reclaim space">🧹 Compact</button>
@@ -407,9 +408,9 @@
       <span class="card__title">⌨️ SQL console <small>advanced · read-only</small></span>
     </summary>
     <div class="card__body stack">
-      <p class="hint" style="margin-top:0"><strong>Citation index only:</strong> the database stores the seven fields confirmed in the Discovery response—title, publication, date, page, article URL, publication CID and article ID. It never stores article text or untouched API responses.</p>
-      <div class="card__actions" style="margin-left:0">
-        <select id="sqlSamples" style="width:auto"><option value="">Example queries…</option></select>
+      <p class="hint hint-flush"><strong>Citation index only:</strong> the database stores the seven fields confirmed in the Discovery response—title, publication, date, page, article URL, publication CID and article ID. It never stores article text or untouched API responses.</p>
+      <div class="card__actions actions-start">
+        <select id="sqlSamples" class="select-auto"><option value="">Example queries…</option></select>
         <button class="btn btn--sm btn--primary" id="runSqlBtn" type="button">▶ Run</button>
         <span class="hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run</span>
       </div>
@@ -419,7 +420,7 @@ GROUP BY publication
 ORDER BY articles DESC;</textarea>
       <div id="sqlError" hidden></div>
       <div id="sqlResultWrap" hidden>
-        <div class="card__actions" style="margin-left:0;margin-bottom:9px">
+        <div class="card__actions actions-spaced">
           <span class="badge badge--ok" id="sqlRowCount"></span>
           <button class="btn btn--sm" data-export-sql="xlsx" type="button">Excel</button>
           <button class="btn btn--sm" data-export-sql="csv"  type="button">CSV</button>
@@ -583,7 +584,7 @@ ORDER BY articles DESC;</textarea>
         </select>
       </div>
 
-      <div class="card__actions" style="margin-left:0">
+      <div class="card__actions actions-start">
         <button class="btn btn--primary" id="testConnBtn" type="button">🔌 Test connection</button>
         <button class="btn btn--ghost" id="resetConnBtn" type="button">Restore defaults</button>
       </div>
@@ -597,14 +598,14 @@ ORDER BY articles DESC;</textarea>
       <details class="disclosure" open>
         <summary>Cloudflare Worker — free, recommended</summary>
         <div class="disclosure__body stack">
-          <ol style="margin:0;padding-left:20px">
+          <ol class="compact-list">
             <li>Sign in at <a href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer">dash.cloudflare.com</a> and open <strong>Workers &amp; Pages → Create → Worker</strong>.</li>
             <li>Name it, click <strong>Deploy</strong>, then <strong>Edit code</strong>.</li>
             <li>Replace the sample code with the script below and click <strong>Deploy</strong> again.</li>
             <li>Copy the <code>*.workers.dev</code> address into the <strong>Proxy URL</strong> box above.</li>
             <li>Edit <code>ALLOWED_ORIGIN</code> in the script so only your own page can use it.</li>
           </ol>
-          <div class="card__actions" style="margin-left:0">
+          <div class="card__actions actions-start">
             <button class="btn btn--sm" id="copyWorkerBtn" type="button">📋 Copy the Worker script</button>
             <a class="btn btn--sm" href="proxy/cloudflare-worker.js" download>⬇️ Download it</a>
           </div>
@@ -670,7 +671,7 @@ ORDER BY articles DESC;</textarea>
         <dt>This page</dt>
         <dd>Static files on GitHub Pages. No analytics, no cookies, no account, no server-side code.</dd>
         <dt>Third-party code</dt>
-        <dd>Exactly one library loads from a public CDN: <a href="https://sql.js.org" target="_blank" rel="noopener noreferrer">sql.js</a>, which is SQLite itself compiled to WebAssembly. It runs entirely in this tab and sends nothing anywhere. Every export format — Excel included — is written by this app's own code, so no data passes through another library.</dd>
+        <dd>No code loads from a third-party CDN. The pinned <a href="https://sql.js.org" target="_blank" rel="noopener noreferrer">sql.js</a> JavaScript and WebAssembly files are bundled with this site and run entirely in this tab. Every export format — Excel included — is written by this app's own code.</dd>
         <dt>Clearing site data</dt>
         <dd>Erases the database. Download the <code>.db</code> file if you want to keep it.</dd>
       </dl>
@@ -756,7 +757,7 @@ ORDER BY articles DESC;</textarea>
         <summary>Diagnostics</summary>
         <div class="disclosure__body">
           <button class="btn btn--sm" id="diagBtn" type="button">Show environment report</button>
-          <pre id="diagOut" hidden style="margin-top:10px"></pre>
+          <pre id="diagOut" class="diag-output" hidden></pre>
         </div>
       </details>
     </div>
@@ -796,6 +797,6 @@ ORDER BY articles DESC;</textarea>
   </div>
 </dialog>
 
-<script src="assets/app.js" type="module"></script>
+<script src="assets/app.js?v=security-20260917" type="module"></script>
 </body>
 </html>

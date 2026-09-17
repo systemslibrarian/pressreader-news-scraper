@@ -55,7 +55,8 @@ through the site's restricted Cloudflare Worker to PressReader.
   Click through to PressReader to read at the source.
 - 📄 **Browse what you collected** — filter, clear all filters in one click, sort, page and tick rows.
   The API-key panel collapses after a key is entered to keep the search controls compact.
-- ⌨️ **A read-only SQL console** with worked examples, and the query result is exportable too.
+- ⌨️ **A collapsible read-only SQL console** under the Database tab for advanced users, with worked
+  examples and exportable query results.
 - 📤 **Excel and CSV first** — the two common choices are prominent; column choices, preview and
   specialist formats are collapsed until needed.
 - 🌓 Light and dark themes; works on a phone.
@@ -241,6 +242,7 @@ assets/title.js                 shared title normalisation for de-duplication
 assets/export.js                CSV / JSON / Markdown / HTML / RIS / BibTeX writers
 assets/xlsx.js                  dependency-free .xlsx + ZIP writer
 assets/styles.css               design system, light and dark
+assets/sqljs/                   vendored sql.js JavaScript, WebAssembly and licence
 proxy/cloudflare-worker.js      the recommended proxy
 proxy/local-proxy.py            a no-account alternative
 proxy/README.md                 setup for six hosting options
@@ -248,7 +250,8 @@ pressreader_api_to_sqlite.ipynb the Colab notebook
 ```
 
 One third-party dependency in total: [sql.js](https://sql.js.org) 1.14.2 (SQLite 3.49.1 compiled to
-WebAssembly), loaded from jsDelivr with an unpkg fallback. No analytics, no cookies, no tracking.
+WebAssembly), pinned and vendored under `assets/sqljs/` with its licence and SHA-256 hashes. No
+runtime code is loaded from a CDN. No analytics, no cookies, no tracking.
 
 ---
 
