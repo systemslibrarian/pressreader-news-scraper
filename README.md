@@ -81,9 +81,10 @@ answers no preflight and returns no `Access-Control-Allow-Origin`. Your browser 
 request **before it is sent**, no matter how valid your key is. That is a browser security rule, and
 nothing in a web page can override it.
 
-So the web app needs a **proxy you deploy yourself** — a single file, free, about five minutes once.
-[`proxy/README.md`](proxy/README.md) walks through it, and the app's *Setup & Help* tab has the code
-with a copy button and a connection test.
+The published web app is preconfigured to use its own Cloudflare Worker. Each visitor enters their
+own PressReader API key; the Worker forwards it only to PressReader and does not log, store, cache,
+or place it in a URL. [`proxy/README.md`](proxy/README.md) explains the design and how publishers of
+forks can deploy their own copy.
 
 - **[`proxy/cloudflare-worker.js`](proxy/cloudflare-worker.js)** — recommended. Free, no credit card.
   The upstream host and path prefix are hard-coded so it can never become an open proxy; only
@@ -168,7 +169,7 @@ with SQLite's JSON functions.
 2. **Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)`.**
 3. Wait a minute; your copy appears at `https://<your-username>.github.io/<repo>/`.
 4. Deploy a proxy ([`proxy/README.md`](proxy/README.md)) and add **your** Pages address to its
-   `ALLOWED_ORIGINS`.
+   `ALLOWED_ORIGIN` setting. Change `DEFAULT_PROXY_URL` in `assets/app.js` to your Worker URL.
 
 Running it locally needs a web server — ES modules and WebAssembly do not load over `file://`:
 
@@ -207,7 +208,7 @@ WebAssembly), loaded from jsDelivr with an unpkg fallback. No analytics, no cook
 | Symptom | Cause |
 | --- | --- |
 | “Failed to fetch” the moment you search | No proxy configured — see [above](#why-a-proxy-is-needed) |
-| `403` from *your own* proxy | Your page's address is missing from its `ALLOWED_ORIGINS` |
+| `403` from *your own* proxy | Your page's address does not match its `ALLOWED_ORIGIN` setting |
 | `400` from the API | `countries` is required; check the date range and any extra JSON |
 | `401` / `403` from the API | Key rejected — check for a stray space, and that your plan covers Discovery search |
 | `429` | Rate limited; fetch fewer articles and wait |
