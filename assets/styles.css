@@ -169,6 +169,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
   min-width: 0;
 }
 
+.wordmark--home {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wordmark--home:hover .wordmark__title { color: var(--accent); }
+.wordmark--home:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; border-radius: 2px; }
+
 .wordmark__title {
   font-family: var(--font-serif);
   font-size: 25px;
