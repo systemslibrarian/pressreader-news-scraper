@@ -19,13 +19,9 @@ const UPSTREAM_HOST = "api.prod.pressreader.com";
 const ALLOWED_PATH_PREFIXES = ["/discovery/"];
 const ALLOWED_METHODS = ["GET", "POST", "OPTIONS"];
 
-// Only these page origins may use the proxy from a browser.
-// Add your GitHub Pages origin. "http://localhost:8000" is for local testing.
-const ALLOWED_ORIGINS = [
-  "https://systemslibrarian.github.io",
-  "http://localhost:8000",
-  "http://127.0.0.1:8000",
-];
+// Require the exact Origin sent by the published GitHub Pages site. Requests
+// from other sites and requests with no Origin header are rejected.
+const ALLOWED_ORIGIN = "https://systemslibrarian.github.io";
 
 // Request headers forwarded upstream. Everything else is dropped, so no
 // cookies, no Authorization, no Referer, no client IP.
@@ -58,7 +54,7 @@ function deny(status, message, origin) {
 export default {
   async fetch(request) {
     const origin = request.headers.get("Origin");
-    const allowed = origin !== null && ALLOWED_ORIGINS.includes(origin);
+    const allowed = origin === ALLOWED_ORIGIN;
 
     // 1. Preflight. Answer before doing anything else, and never call upstream.
     if (request.method === "OPTIONS") {
@@ -66,20 +62,19 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
-    // 2. Reject browser callers from origins we do not serve.
-    //    (A request with no Origin header — curl, a script — is allowed
-    //    through but gets no CORS headers, which is all a browser cares about.)
-    if (origin !== null && !allowed) return deny(403, "Origin not allowed", null);
+    // 2. Fail closed. This includes other sites, curl, scripts, and direct
+    //    visits, because those requests do not carry the required Origin.
+    if (!allowed) return deny(403, "Origin not allowed", null);
 
     if (!ALLOWED_METHODS.includes(request.method)) {
-      return deny(405, "Method not allowed", allowed ? origin : null);
+      return deny(405, "Method not allowed", origin);
     }
 
     // 3. Pin the target. The path and query come from the caller; the host
     //    never does, so this cannot be turned into an open proxy.
     const incoming = new URL(request.url);
     if (!ALLOWED_PATH_PREFIXES.some((p) => incoming.pathname.startsWith(p))) {
-      return deny(404, "Path not proxied by this Worker", allowed ? origin : null);
+      return deny(404, "Path not proxied by this Worker", origin);
     }
     const target = new URL(incoming.pathname + incoming.search, `https://${UPSTREAM_HOST}`);
 
@@ -95,7 +90,7 @@ export default {
     if (request.method !== "GET" && request.method !== "HEAD") {
       const buf = await request.arrayBuffer();
       if (buf.byteLength > MAX_BODY_BYTES) {
-        return deny(413, "Request body too large", allowed ? origin : null);
+        return deny(413, "Request body too large", origin);
       }
       body = buf;
     }
@@ -112,11 +107,11 @@ export default {
       });
     } catch {
       // Deliberately does not include the exception: it can echo request data.
-      return deny(502, "Upstream request failed", allowed ? origin : null);
+      return deny(502, "Upstream request failed", origin);
     }
 
     // 7. Return the upstream reply with CORS headers attached.
-    const out = allowed ? corsHeaders(origin) : new Headers();
+    const out = corsHeaders(origin);
     for (const name of FORWARD_RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
       if (value !== null) out.set(name, value);
