@@ -516,9 +516,9 @@ ORDER BY articles DESC;</textarea>
           <code>Access-Control-Allow-Origin</code>, so your browser blocks the request before it is even sent —
           no matter how valid your key is. Nothing in this page can override that; it is a browser security rule.
           <br><br>
-          <strong>So you need a proxy of your own</strong> — a few lines of code you deploy once, free, that
-          forwards requests and adds the missing header. Instructions are below, and the connection test will
-          confirm it works. If you would rather not deploy anything, the
+          <strong>This published app is already configured with its own restricted proxy.</strong> Each visitor
+          uses their own PressReader API key. The connection test below confirms that the proxy and key work.
+          If you would rather not send the key through this site's Worker, the
           <a href="https://colab.research.google.com/github/systemslibrarian/pressreader-news-scraper/blob/main/pressreader_api_to_sqlite.ipynb" target="_blank" rel="noopener noreferrer">companion Colab notebook</a>
           calls the API from Python, where CORS does not apply at all — then drag the <code>.db</code> it produces
           onto the Database tab here to use the browsing and export tools.
@@ -532,11 +532,12 @@ ORDER BY articles DESC;</textarea>
       </div>
 
       <div class="field">
-        <label class="label" for="proxyUrl">Proxy URL <span class="muted">(leave empty to call PressReader directly)</span></label>
+        <label class="label" for="proxyUrl">Proxy URL <span class="muted">(preconfigured for this site)</span></label>
         <input type="url" id="proxyUrl" placeholder="https://your-worker.workers.dev" spellcheck="false">
         <p class="hint">
-          Your request is sent to this address instead, and the proxy forwards it to PressReader.
-          <strong>Only ever use a proxy you deployed yourself</strong> — whoever runs the proxy can read your API key.
+          Your request is sent through this site's Cloudflare Worker only to reach PressReader.
+          The Worker does not log, store, cache, or place your API key in a URL. Each visitor supplies
+          their own PressReader key. You may configure your own compatible proxy if you prefer.
         </p>
       </div>
 
@@ -567,7 +568,7 @@ ORDER BY articles DESC;</textarea>
             <li>Name it, click <strong>Deploy</strong>, then <strong>Edit code</strong>.</li>
             <li>Replace the sample code with the script below and click <strong>Deploy</strong> again.</li>
             <li>Copy the <code>*.workers.dev</code> address into the <strong>Proxy URL</strong> box above.</li>
-            <li>Edit <code>ALLOWED_ORIGINS</code> in the script so only your own page can use it.</li>
+            <li>Edit <code>ALLOWED_ORIGIN</code> in the script so only your own page can use it.</li>
           </ol>
           <div class="card__actions" style="margin-left:0">
             <button class="btn btn--sm" id="copyWorkerBtn" type="button">📋 Copy the Worker script</button>
@@ -618,7 +619,7 @@ ORDER BY articles DESC;</textarea>
         <div class="note__body">
           <strong>Do not use a public "open CORS proxy".</strong> Services like <code>cors-anywhere</code> or
           <code>corsproxy.io</code> would receive your API key in plain text and could store or replay it.
-          A proxy you deploy yourself costs nothing and keeps the key between you and PressReader.
+          Use this site's restricted Worker or a compatible proxy you control instead.
         </div>
       </div>
     </div>
@@ -651,7 +652,7 @@ ORDER BY articles DESC;</textarea>
           <p>If you have no proxy configured, this is expected and is not a fault in your key — PressReader
           sends no CORS headers, so the browser refuses the request. Set up the proxy above.</p>
           <p>If you <em>do</em> have a proxy configured: check the address is exactly right, that the proxy is
-          deployed and awake, and that its <code>ALLOWED_ORIGINS</code> list contains this page's address
+          deployed and awake, and that its <code>ALLOWED_ORIGIN</code> setting contains this page's address
           (<code id="thisOrigin">this origin</code>). Then run the connection test.</p>
           <p><strong>Serving the page from <code>python -m http.server</code> does not fix this.</strong> A local
           server changes your page's address but has nothing to do with the request to PressReader, which still
