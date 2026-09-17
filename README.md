@@ -45,6 +45,8 @@ through the site's restricted Cloudflare Worker to PressReader.
 - 🛠️ **Key-safe search debugging** — enable *Debug this search* under *More filters* to see the
   exact request body, page URLs, HTTP status and timing, API totals and returned titles, plus what
   the collector kept or skipped. The API key and request headers are deliberately never recorded.
+- 🧽 **Copied-headline cleanup** — invisible soft hyphens and zero-width formatting characters
+  inserted by newspaper layouts are removed from search text automatically before it reaches the API.
 - 🧹 **Two layers of de-duplication** — article-ID protection is always active; optional title
   matching skips syndicated copies and reports the number skipped. The Results table can also hide
   title duplicates already present without deleting the underlying records.
@@ -262,6 +264,7 @@ WebAssembly), loaded from jsDelivr with an unpkg fallback. No analytics, no cook
 | `401` / `403` from the API | Key rejected — check for a stray space, and that your plan covers Discovery search |
 | `429` | Rate limited; fetch fewer articles and wait |
 | A known article is missing | Enable *Debug this search*. If it is absent from `api.pages[].items`, PressReader did not return it; the collector did not discard it |
+| A copied headline returns zero matches | Invisible newspaper-layout characters are stripped automatically; the app reports when it removes them |
 | Excel mangles accents in a CSV | Keep the UTF-8 BOM ticked, or export `.xlsx` instead |
 | The database vanished | Browser storage is per-profile and private windows discard it. Download the `.db` for anything you want to keep |
 

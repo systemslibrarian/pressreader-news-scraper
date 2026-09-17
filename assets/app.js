@@ -699,6 +699,17 @@ function setProgress(fetched, target, page, totalCount, titleDuplicates = 0) {
 async function runSearch({ preview = false } = {}) {
   if (!state.store) return;
   const form = readForm();
+  const cleanedQuery = api.cleanSearchText(form.query);
+  const removedFormatting = [...form.query].length - [...cleanedQuery].length;
+  if (removedFormatting > 0) {
+    form.query = cleanedQuery;
+    $('#query').value = cleanedQuery;
+    toast(
+      'Invisible formatting removed',
+      `${removedFormatting} hidden character${removedFormatting === 1 ? '' : 's'} from copied newspaper text ${removedFormatting === 1 ? 'was' : 'were'} removed before searching.`,
+      'info', 7000
+    );
+  }
 
   if (!state.apiKey) {
     toast('No API key', 'Paste your PressReader key above, or use “Load sample data” to try the app first.', 'warn');

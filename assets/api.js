@@ -17,6 +17,16 @@ import { titleKey } from './title.js';
 
 export const DEFAULT_ENDPOINT = 'https://api.prod.pressreader.com/discovery/v1/search';
 
+// Copied newspaper text commonly contains discretionary soft hyphens and
+// zero-width/bidirectional formatting characters inserted for line wrapping.
+// They are invisible in the form but can make the Discovery query parser see
+// a different word (for example, "Hit\u00ADting" instead of "Hitting").
+const INVISIBLE_SEARCH_FORMATTING = /[\u00AD\u034F\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/gu;
+
+export function cleanSearchText(value) {
+  return String(value ?? '').replace(INVISIBLE_SEARCH_FORMATTING, '');
+}
+
 /** Hosts that must never receive an API key. See rejectUnsafeProxy(). */
 const PUBLIC_PROXY_HOSTS = [
   'corsproxy.io', 'allorigins.win', 'thingproxy.freeboard.io', 'herokuapp.com',
@@ -113,7 +123,7 @@ export function buildRequestUrl(conn, page = {}) {
 /** Assembles the JSON request body from the search form's values. */
 export function buildRequestBody(form) {
   const body = {};
-  const query = (form.query || '').trim();
+  const query = cleanSearchText(form.query).trim();
   if (query) body.query = query;
 
   const list = (value) => String(value || '')
