@@ -222,7 +222,7 @@ export const ARTICLE_COLUMNS = [
   { key: 'author',           label: 'Author',           core: true,  width: 22 },
   { key: 'url',              label: 'Article URL',      core: true,  width: 46 },
   { key: 'section',          label: 'Section',          core: false, width: 16 },
-  { key: 'content',          label: 'Full text',        core: false, width: 90 },
+  { key: 'content',          label: 'Full text (when supplied)', core: false, width: 90 },
   { key: 'page',             label: 'Page',             core: false, width: 7  },
   { key: 'issue_page_count', label: 'Pages in issue',   core: false, width: 13 },
   { key: 'language',         label: 'Language',         core: false, width: 10 },

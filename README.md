@@ -194,7 +194,8 @@ ticket, or your account manager.
 
 ```sql
 articles(id PK, title, subtitle, summary, publication, publication_cid, publication_type,
-         author, date, page, language, countries, categories, entities, sentiment,
+         publisher, issn, author, section, content, date, page, issue_page_count,
+         language, countries, categories, entities, sentiment,
          copyright, url, issue_url, publication_url, page_url, image_url, media_count,
          first_query, first_run_id, fetched_at, raw)
 
@@ -207,6 +208,10 @@ article_searches(article_id, search_id, position)   -- which run found what, and
 `raw` holds the untouched API response for each article, so you can reach fields the app does not
 model — `SELECT json_extract(raw, '$.entities[0].name') FROM articles;` works, since sql.js ships
 with SQLite's JSON functions.
+
+`content` stores full article text only when the Discovery API includes it. Many search results
+contain metadata, a summary and PressReader links but no full text. The web app does not scrape the
+linked reading page to fill that gap.
 
 ---
 

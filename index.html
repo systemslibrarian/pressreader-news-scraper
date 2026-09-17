@@ -413,6 +413,7 @@
       </div>
     </div>
     <div class="card__body stack">
+      <p class="hint" style="margin-top:0"><strong>About full text:</strong> it is stored only when the PressReader Discovery API supplies it. Many results contain metadata and links but no article text; an empty <code>content</code> value is not a display error, and this app does not scrape the reading page.</p>
       <textarea id="sqlInput" rows="5" spellcheck="false">SELECT publication, COUNT(*) AS articles
 FROM articles
 GROUP BY publication
@@ -431,10 +432,10 @@ ORDER BY articles DESC;</textarea>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card__head"><div class="card__title">📐 Schema</div></div>
-    <div class="card__body"><pre id="schemaOut">—</pre></div>
-  </div>
+  <details class="disclosure">
+    <summary>📐 Database schema <span class="muted">advanced</span></summary>
+    <div class="disclosure__body"><pre id="schemaOut">—</pre></div>
+  </details>
 
 </section>
 
