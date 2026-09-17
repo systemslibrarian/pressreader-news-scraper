@@ -322,6 +322,11 @@ function filterClause() {
   return { where: clauses.length ? 'WHERE ' + clauses.join(' AND ') : '', params };
 }
 
+function hasActiveResultsFilters() {
+  const f = state.filters;
+  return Boolean(f.text.trim() || f.publication || f.searchId || f.from || f.to);
+}
+
 const SORTABLE = new Set(['title', 'publication', 'date', 'author', 'fetched_at']);
 
 function orderClause() {
@@ -438,6 +443,7 @@ function renderResults() {
   $('#prevPageBtn').disabled = state.page === 0;
   $('#nextPageBtn').disabled = state.page >= pages - 1;
   $('#headCheck').checked = rows.length > 0 && rows.every((r) => state.selected.has(r.id));
+  $('#clearFiltersBtn').disabled = !hasActiveResultsFilters();
 
   renderSelectionUi();
   renderStats();
@@ -1337,6 +1343,21 @@ function wireResults() {
   on($('#filterDedupeTitles'), 'change', (e) => {
     state.filters.dedupeTitles = e.target.checked;
     rerender();
+  });
+  on($('#clearFiltersBtn'), 'click', () => {
+    clearTimeout(debounce);
+    state.filters.text = '';
+    state.filters.publication = '';
+    state.filters.searchId = '';
+    state.filters.from = '';
+    state.filters.to = '';
+    $('#filterText').value = '';
+    $('#filterPublication').value = '';
+    $('#filterQuery').value = '';
+    $('#filterFrom').value = '';
+    $('#filterTo').value = '';
+    rerender();
+    toast('Filters cleared', '', 'info', 2000);
   });
 
   $$('#articlesTable th.sortable').forEach((th) => {

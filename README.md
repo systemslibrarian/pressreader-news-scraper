@@ -43,8 +43,9 @@ through the site's restricted Cloudflare Worker to PressReader.
 - 🧹 **Two layers of de-duplication** — article-ID protection is always active; optional title
   matching skips syndicated copies and reports the number skipped. The Results table can also hide
   title duplicates already present without deleting the underlying records.
-- 📄 **Browse what you collected** — filter, sort, page, tick rows, inspect every field including the
-  raw JSON. The API-key panel collapses after a key is entered to keep the search controls compact.
+- 📄 **Browse what you collected** — filter, clear all filters in one click, sort, page, tick rows and
+  inspect every field including the raw JSON. The API-key panel collapses after a key is entered to
+  keep the search controls compact.
 - ⌨️ **A read-only SQL console** with worked examples, and the query result is exportable too.
 - 📤 **Ten export formats**, with a live preview of exactly what will be written.
 - 🌓 Light and dark themes; works on a phone.
