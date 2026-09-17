@@ -37,8 +37,8 @@ const UPSTREAM_TIMEOUT_MS = 20_000;
 function corsHeaders(origin) {
   const h = new Headers();
   h.set("Access-Control-Allow-Origin", origin);
-  h.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  h.set("Access-Control-Allow-Headers", "api-key, content-type, accept");
+  h.set("Access-Control-Allow-Methods", ALLOWED_METHODS.join(", "));
+  h.set("Access-Control-Allow-Headers", FORWARD_REQUEST_HEADERS.join(", "));
   h.set("Access-Control-Max-Age", "86400");
   h.set("Vary", "Origin");
   return h;
@@ -73,7 +73,16 @@ export default {
     // 3. Pin the target. The path and query come from the caller; the host
     //    never does, so this cannot be turned into an open proxy.
     const incoming = new URL(request.url);
-    if (!ALLOWED_PATH_PREFIXES.some((p) => incoming.pathname.startsWith(p))) {
+    let decodedPath;
+    try {
+      decodedPath = decodeURIComponent(incoming.pathname);
+    } catch {
+      return deny(400, "Malformed path", origin);
+    }
+    if (
+      decodedPath.includes("..") ||
+      !ALLOWED_PATH_PREFIXES.some((p) => decodedPath.startsWith(p))
+    ) {
       return deny(404, "Path not proxied by this Worker", origin);
     }
     const target = new URL(incoming.pathname + incoming.search, `https://${UPSTREAM_HOST}`);
@@ -88,6 +97,10 @@ export default {
     // 5. Read and size-cap the body.
     let body = null;
     if (request.method !== "GET" && request.method !== "HEAD") {
+      const declared = request.headers.get("content-length");
+      if (declared !== null && Number(declared) > MAX_BODY_BYTES) {
+        return deny(413, "Request body too large", origin);
+      }
       const buf = await request.arrayBuffer();
       if (buf.byteLength > MAX_BODY_BYTES) {
         return deny(413, "Request body too large", origin);
@@ -108,6 +121,12 @@ export default {
     } catch {
       // Deliberately does not include the exception: it can echo request data.
       return deny(502, "Upstream request failed", origin);
+    }
+
+    // A redirect cannot be followed safely because `location` is intentionally
+    // excluded from the response-header allow-list.
+    if (upstream.status >= 300 && upstream.status < 400) {
+      return deny(502, "Upstream redirected", origin);
     }
 
     // 7. Return the upstream reply with CORS headers attached.

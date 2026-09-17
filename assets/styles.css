@@ -346,6 +346,7 @@ textarea { resize: vertical; min-height: 84px; font-family: var(--font-mono); fo
 .checkline span { min-width: 0; }
 .checkline em { display: block; font-style: normal; color: var(--ink-faint); font-size: 12px; }
 .checkline--compact { padding: 1px 0; }
+.results-dedupe { margin-top: 12px; }
 
 .inputgroup { display: flex; gap: 8px; align-items: stretch; }
 .inputgroup > input { flex: 1; min-width: 0; }

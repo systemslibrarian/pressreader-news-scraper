@@ -7,6 +7,7 @@
    ========================================================================== */
 
 import { Store, ARTICLE_COLUMNS, SQLJS_VERSION } from './db.js';
+import { titleKey } from './title.js';
 import * as api from './api.js';
 import * as ex from './export.js';
 const safeHref = ex.safeHref;
@@ -154,7 +155,7 @@ const state = {
   sort: { key: 'date', dir: 'desc' },
   page: 0,
   pageSize: 50,
-  filters: { text: '', publication: '', searchId: '', from: '', to: '' },
+  filters: { text: '', publication: '', searchId: '', from: '', to: '', dedupeTitles: true },
   lastRunId: null,
   rowsOnPage: [],
   controller: null,
@@ -335,16 +336,36 @@ function renderResults() {
   const tbody = $('#articlesTable tbody');
   const { where, params } = filterClause();
 
-  const total = Number(state.store.scalar(`SELECT COUNT(*) AS n FROM articles ${where}`, params) ?? 0);
+  let hiddenTitleDuplicates = 0;
+  let allRows = null;
+  let total;
+  if (state.filters.dedupeTitles) {
+    const seenTitles = new Set();
+    allRows = state.store.all(`SELECT * FROM articles ${where} ${orderClause()}`, params)
+      .filter((row) => {
+        const key = titleKey(row.title);
+        if (!key || !seenTitles.has(key)) {
+          if (key) seenTitles.add(key);
+          return true;
+        }
+        hiddenTitleDuplicates += 1;
+        return false;
+      });
+    total = allRows.length;
+  } else {
+    total = Number(state.store.scalar(`SELECT COUNT(*) AS n FROM articles ${where}`, params) ?? 0);
+  }
   const pages = Math.max(1, Math.ceil(total / state.pageSize));
   if (state.page >= pages) state.page = pages - 1;
   if (state.page < 0) state.page = 0;
   const offset = state.page * state.pageSize;
 
-  const rows = state.store.all(
-    `SELECT * FROM articles ${where} ${orderClause()} LIMIT ? OFFSET ?`,
-    [...params, state.pageSize, offset]
-  );
+  const rows = allRows
+    ? allRows.slice(offset, offset + state.pageSize)
+    : state.store.all(
+      `SELECT * FROM articles ${where} ${orderClause()} LIMIT ? OFFSET ?`,
+      [...params, state.pageSize, offset]
+    );
   state.rowsOnPage = rows;
 
   tbody.replaceChildren();
@@ -404,8 +425,15 @@ function renderResults() {
   const from = total ? offset + 1 : 0;
   const to = Math.min(offset + rows.length, total);
   $('#pagerCount').textContent = total
-    ? `Showing ${fmtInt(from)}–${fmtInt(to)} of ${fmtInt(total)}`
+    ? `Showing ${fmtInt(from)}–${fmtInt(to)} of ${fmtInt(total)}` +
+      (hiddenTitleDuplicates ? ` · ${fmtInt(hiddenTitleDuplicates)} duplicate title${hiddenTitleDuplicates === 1 ? '' : 's'} hidden` : '')
     : 'No articles';
+  const hiddenCount = $('#hiddenTitleCount');
+  if (hiddenCount) {
+    hiddenCount.textContent = hiddenTitleDuplicates
+      ? `${fmtInt(hiddenTitleDuplicates)} duplicate title${hiddenTitleDuplicates === 1 ? '' : 's'} hidden`
+      : 'No duplicate titles hidden';
+  }
   $('#pagerPage').textContent = `Page ${state.page + 1} of ${pages}`;
   $('#prevPageBtn').disabled = state.page === 0;
   $('#nextPageBtn').disabled = state.page >= pages - 1;
@@ -1306,6 +1334,10 @@ function wireResults() {
   on($('#filterQuery'), 'change', (e) => { state.filters.searchId = e.target.value; rerender(); });
   on($('#filterFrom'), 'change', (e) => { state.filters.from = e.target.value; rerender(); });
   on($('#filterTo'), 'change', (e) => { state.filters.to = e.target.value; rerender(); });
+  on($('#filterDedupeTitles'), 'change', (e) => {
+    state.filters.dedupeTitles = e.target.checked;
+    rerender();
+  });
 
   $$('#articlesTable th.sortable').forEach((th) => {
     on(th, 'click', () => {
