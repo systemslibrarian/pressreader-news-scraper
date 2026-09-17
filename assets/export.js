@@ -88,10 +88,6 @@ function pick(row, columns) {
   for (const col of columns) {
     let v = row[col.key];
     if (v === undefined) v = null;
-    // `raw` is stored as a JSON string; re-nest it so the file stays valid JSON.
-    if (col.key === 'raw' && typeof v === 'string' && v) {
-      try { v = JSON.parse(v); } catch { /* leave the string as-is */ }
-    }
     out[col.key] = v;
   }
   return out;

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PressReader Collector — search, store &amp; export news articles</title>
-<meta name="description" content="A no-server web app: search the PressReader Discovery API with your own key, store results in a SQLite database in your browser, and export to Excel, CSV, JSON, Markdown or a .db file.">
+<meta name="description" content="A no-server web app: search PressReader with your own key, store citation metadata and links in SQLite, and export to Excel or CSV.">
 <meta name="color-scheme" content="light dark">
 <link rel="stylesheet" href="assets/styles.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%B0%3C/text%3E%3C/svg%3E">
@@ -49,6 +49,8 @@
       <strong>Your collection stays in your browser.</strong> Live API requests carry your key through this
       site's restricted Cloudflare Worker to PressReader; the Worker does not store it. Saved articles live
       in a SQLite database in your browser, and you can download the <code>.db</code> file at any time.
+      <br><strong>Stores citations and PressReader links—not article text.</strong>
+      Click a result to read the article at the source.
       <br>
       No key yet? <button class="btn btn--sm" id="loadDemoBtn" type="button">Load sample data</button>
       to try the whole workflow first.
@@ -216,12 +218,6 @@
               </span>
             </label>
             <label class="checkline">
-              <input type="checkbox" id="storeRaw" checked>
-              <span>Keep the raw JSON for every article
-                <em>Lets you query and export fields this app does not model. Uses more space.</em>
-              </span>
-            </label>
-            <label class="checkline">
               <input type="checkbox" id="updateExisting">
               <span>Refresh articles already in the database
                 <em>Off: duplicates are skipped and counted. On: existing rows are overwritten with the newer copy.</em>
@@ -315,7 +311,7 @@
       <div class="grid grid--4">
         <div class="field field--wide">
           <label class="label" for="filterText">Filter</label>
-          <input type="search" id="filterText" placeholder="Filter title, summary, publication, author…">
+          <input type="search" id="filterText" placeholder="Filter title or publication…">
         </div>
         <div class="field">
           <label class="label" for="filterPublication">Publication</label>
@@ -348,8 +344,6 @@
           <th class="sortable" data-sort="title">Title <span class="arrow">↕</span></th>
           <th class="sortable" data-sort="publication">Publication <span class="arrow">↕</span></th>
           <th class="sortable" data-sort="date">Date <span class="arrow">↕</span></th>
-          <th class="sortable" data-sort="author">Author <span class="arrow">↕</span></th>
-          <th>Summary</th>
           <th></th>
         </tr></thead>
         <tbody></tbody>
@@ -417,7 +411,7 @@
       </div>
     </div>
     <div class="card__body stack">
-      <p class="hint" style="margin-top:0"><strong>About full text:</strong> it is stored only when the PressReader Discovery API supplies it. Many results contain metadata and links but no article text; an empty <code>content</code> value is not a display error, and this app does not scrape the reading page.</p>
+      <p class="hint" style="margin-top:0"><strong>Citation index only:</strong> the database stores the seven fields confirmed in the Discovery response—title, publication, date, page, article URL, publication CID and article ID. It never stores article text or untouched API responses.</p>
       <textarea id="sqlInput" rows="5" spellcheck="false">SELECT publication, COUNT(*) AS articles
 FROM articles
 GROUP BY publication
@@ -448,12 +442,12 @@ ORDER BY articles DESC;</textarea>
 
   <div class="card">
     <div class="card__head">
-      <div class="card__title">1 · What to export</div>
+      <div class="card__title">📤 Export your results</div>
       <div class="card__actions"><span class="badge badge--info" id="exportCountBadge">0 rows</span></div>
     </div>
     <div class="card__body stack">
       <div class="field">
-        <label class="label" for="exportScope">Rows</label>
+        <label class="label" for="exportScope">What should be included?</label>
         <select id="exportScope">
           <option value="all">Every article in the database</option>
           <option value="filtered">Only articles matching the filters on the Results tab</option>
@@ -461,54 +455,40 @@ ORDER BY articles DESC;</textarea>
           <option value="lastrun">Only the articles from my most recent search</option>
         </select>
       </div>
-      <div class="field">
-        <label class="label">Columns</label>
-        <div class="chiprow" id="columnChips"></div>
-        <p class="hint">
-          <button class="btn btn--sm btn--ghost" id="colsAllBtn" type="button">All</button>
-          <button class="btn btn--sm btn--ghost" id="colsCoreBtn" type="button">Core fields</button>
-        </p>
-      </div>
       <div class="grid grid--2">
-        <div class="field">
-          <label class="label" for="exportSort">Order by</label>
-          <select id="exportSort">
-            <option value="date DESC">Date — newest first</option>
-            <option value="date ASC">Date — oldest first</option>
-            <option value="publication ASC, date DESC">Publication, then date</option>
-            <option value="title ASC">Title A→Z</option>
-            <option value="fetched_at DESC">When I collected it</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="label" for="exportFilename">File name</label>
-          <input type="text" id="exportFilename" placeholder="pressreader-articles">
-        </div>
+        <button class="btn btn--block btn--primary" data-export="xlsx" type="button">📊 Download Excel <span>.xlsx</span></button>
+        <button class="btn btn--block" data-export="csv" type="button">📋 Download CSV <span class="muted">.csv</span></button>
       </div>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="card__head"><div class="card__title">2 · Format</div></div>
-    <div class="card__body stack">
-      <div class="grid grid--3" id="formatGrid">
-        <button class="btn btn--block" data-export="xlsx"   type="button">📊 Excel <span class="muted">.xlsx</span></button>
-        <button class="btn btn--block" data-export="csv"    type="button">📋 CSV <span class="muted">.csv</span></button>
-        <button class="btn btn--block" data-export="tsv"    type="button">📋 Tab-separated <span class="muted">.tsv</span></button>
-        <button class="btn btn--block" data-export="json"   type="button">🧩 JSON <span class="muted">.json</span></button>
-        <button class="btn btn--block" data-export="ndjson" type="button">🧩 JSON Lines <span class="muted">.ndjson</span></button>
-        <button class="btn btn--block" data-export="md"     type="button">📝 Markdown <span class="muted">.md</span></button>
-        <button class="btn btn--block" data-export="html"   type="button">🌐 HTML table <span class="muted">.html</span></button>
-        <button class="btn btn--block" data-export="ris"    type="button">🎓 RIS citations <span class="muted">.ris</span></button>
-        <button class="btn btn--block" data-export="bibtex" type="button">🎓 BibTeX <span class="muted">.bib</span></button>
-        <button class="btn btn--block" data-export="db"     type="button">🗄️ SQLite <span class="muted">.db</span></button>
-      </div>
       <details class="disclosure">
-        <summary>Format options</summary>
+        <summary>Customize export</summary>
         <div class="disclosure__body stack">
+          <div class="field">
+            <label class="label">Columns</label>
+            <div class="chiprow" id="columnChips"></div>
+            <p class="hint">
+              <button class="btn btn--sm btn--ghost" id="colsAllBtn" type="button">Select all</button>
+              <button class="btn btn--sm btn--ghost" id="colsCoreBtn" type="button">Reset</button>
+            </p>
+          </div>
+          <div class="grid grid--2">
+            <div class="field">
+              <label class="label" for="exportSort">Order by</label>
+              <select id="exportSort">
+                <option value="date DESC">Date — newest first</option>
+                <option value="date ASC">Date — oldest first</option>
+                <option value="publication ASC, date DESC">Publication, then date</option>
+                <option value="title ASC">Title A→Z</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label" for="exportFilename">File name</label>
+              <input type="text" id="exportFilename" placeholder="pressreader-articles">
+            </div>
+          </div>
           <label class="checkline">
             <input type="checkbox" id="optBom" checked>
-            <span>Add a UTF-8 byte-order mark to CSV/TSV
+            <span>Keep international characters readable in CSV
               <em>Keeps accents and non-Latin scripts intact when the file is double-clicked into Excel on Windows.</em>
             </span>
           </label>
@@ -520,23 +500,36 @@ ORDER BY articles DESC;</textarea>
           </label>
           <label class="checkline">
             <input type="checkbox" id="optExcelSheets" checked>
-            <span>Give the Excel workbook extra sheets
+            <span>Add summary sheets to Excel
               <em>Adds "By publication", "By month" and "Searches" summary tabs alongside the article list.</em>
             </span>
           </label>
-          <label class="checkline">
-            <input type="checkbox" id="optPretty" checked>
-            <span>Indent JSON for readability</span>
-          </label>
         </div>
       </details>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="card__head"><div class="card__title">3 · Preview <small>first 10 rows, exactly as they will be written</small></div></div>
-    <div class="card__body card__body--flush">
-      <div class="tablewrap"><table class="data" id="previewTable"><thead></thead><tbody></tbody></table></div>
+      <details class="disclosure">
+        <summary>Other export formats</summary>
+        <div class="disclosure__body grid grid--3" id="formatGrid">
+          <button class="btn btn--block" data-export="tsv"    type="button">Tab-separated <span class="muted">.tsv</span></button>
+          <button class="btn btn--block" data-export="json"   type="button">JSON <span class="muted">.json</span></button>
+          <button class="btn btn--block" data-export="ndjson" type="button">JSON Lines <span class="muted">.ndjson</span></button>
+          <button class="btn btn--block" data-export="md"     type="button">Markdown <span class="muted">.md</span></button>
+          <button class="btn btn--block" data-export="html"   type="button">HTML table <span class="muted">.html</span></button>
+          <button class="btn btn--block" data-export="ris"    type="button">RIS citations <span class="muted">.ris</span></button>
+          <button class="btn btn--block" data-export="bibtex" type="button">BibTeX <span class="muted">.bib</span></button>
+          <button class="btn btn--block" data-export="db"     type="button">SQLite database <span class="muted">.db</span></button>
+        </div>
+      </details>
+
+      <label class="visually-hidden" for="optPretty">Indent JSON for readability</label>
+      <input class="visually-hidden" type="checkbox" id="optPretty" checked>
+
+      <details class="disclosure">
+        <summary>Preview the first 10 rows</summary>
+        <div class="disclosure__body tablewrap">
+          <table class="data" id="previewTable"><thead></thead><tbody></tbody></table>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -738,10 +731,9 @@ ORDER BY articles DESC;</textarea>
       <details class="disclosure">
         <summary>The search works but every field is empty</summary>
         <div class="disclosure__body">
-          <p>The API's response shape may differ from what this app expects. Turn on "Keep the raw JSON",
-          run one search, then open the Database tab and run
-          <code>SELECT raw FROM articles LIMIT 1;</code> to see exactly what came back — then tell us, or map the
-          fields yourself in <code>assets/api.js</code>.</p>
+          <p>Open <strong>Advanced options</strong>, enable <strong>Debug this search</strong>, and run it again.
+          The key-safe report shows the returned IDs, titles, publications, dates, pages and links without
+          retaining article text or the untouched API response.</p>
         </div>
       </details>
       <details class="disclosure">

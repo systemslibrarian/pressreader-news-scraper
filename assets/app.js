@@ -131,6 +131,7 @@ const SETTINGS_KEY = 'pressreader-collector:settings';
 const KEY_STORAGE = 'pressreader-collector:api-key';
 const DEFAULT_PROXY_URL = 'https://pressreader-proxy.systemslibrarian.workers.dev';
 const SEARCH_DEFAULTS_VERSION = 1;
+const EXPORT_FIELDS_VERSION = 1;
 
 const defaultSettings = () => ({
   endpoint: api.DEFAULT_ENDPOINT,
@@ -142,6 +143,7 @@ const defaultSettings = () => ({
   exportColumns: ARTICLE_COLUMNS.filter((c) => c.core).map((c) => c.key),
   form: defaultSearchForm(),
   searchDefaultsVersion: SEARCH_DEFAULTS_VERSION,
+  exportFieldsVersion: EXPORT_FIELDS_VERSION,
 });
 
 function loadSettings() {
@@ -159,6 +161,11 @@ function loadSettings() {
   if (saved.searchDefaultsVersion !== SEARCH_DEFAULTS_VERSION) {
     base.form = { ...(base.form || {}), ...defaultSearchForm() };
     base.searchDefaultsVersion = SEARCH_DEFAULTS_VERSION;
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(base)); } catch { /* optional persistence */ }
+  }
+  if (saved.exportFieldsVersion !== EXPORT_FIELDS_VERSION) {
+    base.exportColumns = ARTICLE_COLUMNS.map((col) => col.key);
+    base.exportFieldsVersion = EXPORT_FIELDS_VERSION;
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(base)); } catch { /* optional persistence */ }
   }
   return base;
@@ -333,7 +340,7 @@ function filterClause() {
 
   if (f.text.trim()) {
     const p = likeParam(f.text.trim());
-    const cols = ['title', 'subtitle', 'summary', 'publication', 'author', 'categories', 'entities'];
+    const cols = ['title', 'publication'];
     clauses.push('(' + cols.map((c) => `${c} LIKE ? ESCAPE '\\'`).join(' OR ') + ')');
     cols.forEach(() => params.push(p));
   }
@@ -352,7 +359,7 @@ function hasActiveResultsFilters() {
   return Boolean(f.text.trim() || f.publication || f.searchId || f.from || f.to);
 }
 
-const SORTABLE = new Set(['title', 'publication', 'date', 'author', 'fetched_at']);
+const SORTABLE = new Set(['title', 'publication', 'date']);
 
 function orderClause() {
   const key = SORTABLE.has(state.sort.key) ? state.sort.key : 'date';
@@ -405,7 +412,7 @@ function renderResults() {
       ? ['No articles yet', 'Run a search, load the sample data, or import a .db file.']
       : ['Nothing matches these filters', 'Try clearing the filter boxes above.'];
     tbody.append(el('tr', {}, [
-      el('td', { colspan: '7' }, [
+      el('td', { colspan: '5' }, [
         el('div', { class: 'empty' }, [
           el('span', { class: 'empty__icon', text: '🗞️' }),
           el('div', { class: 'empty__title', text: message[0] }),
@@ -440,8 +447,6 @@ function renderResults() {
       ]),
       el('td', { class: 'clip', title: row.publication || '' }, [row.publication || '—']),
       el('td', { class: 'nowrap' }, [row.date || '—']),
-      el('td', { class: 'clip', title: row.author || '' }, [row.author || '—']),
-      el('td', { class: 'clip', title: row.summary || '' }, [truncate(row.summary || '—', 90)]),
       el('td', { class: 'nowrap' }, [
         el('button', {
           class: 'btn btn--sm btn--ghost', type: 'button', title: 'Show every field',
@@ -491,7 +496,6 @@ function showDetail(row) {
   for (const col of ARTICLE_COLUMNS) {
     const value = row[col.key];
     if (value === null || value === undefined || value === '') continue;
-    if (col.key === 'raw') continue;
     dl.append(el('dt', { text: col.label }));
     const href = safeHref(value);
     dl.append(el('dd', {}, [
@@ -502,14 +506,6 @@ function showDetail(row) {
   }
   body.replaceChildren(dl);
 
-  if (row.raw) {
-    let pretty = row.raw;
-    try { pretty = JSON.stringify(JSON.parse(row.raw), null, 2); } catch { /* show as-is */ }
-    body.append(el('details', { class: 'disclosure', style: 'margin-top:16px' }, [
-      el('summary', { text: 'Raw JSON from the API' }),
-      el('div', { class: 'disclosure__body' }, [el('pre', {}, [el('code', { text: pretty })])]),
-    ]));
-  }
   $('.dialog__title', $('#detailDialog')).textContent = row.title || 'Article';
   $('#detailDialog').showModal();
 }
@@ -611,7 +607,6 @@ function readForm() {
     pageSize: Number($('#pageSize').value) || 25,
     startOffset: Number($('#startOffset').value) || 0,
     sort: $('#sortOrder').value,
-    keepRaw: $('#storeRaw').checked,
     overwrite: $('#updateExisting').checked,
     dedupeByTitle: $('#dedupeTitles').checked,
     debugMode: $('#debugMode').checked,
@@ -635,7 +630,6 @@ function writeForm(form) {
   set('#pageSize', form.pageSize);
   set('#startOffset', form.startOffset);
   set('#sortOrder', form.sort);
-  if (typeof form.keepRaw === 'boolean') $('#storeRaw').checked = form.keepRaw;
   if (typeof form.overwrite === 'boolean') $('#updateExisting').checked = form.overwrite;
   if (typeof form.dedupeByTitle === 'boolean') $('#dedupeTitles').checked = form.dedupeByTitle;
   if (typeof form.debugMode === 'boolean') $('#debugMode').checked = form.debugMode;
@@ -750,7 +744,6 @@ async function runSearch({ preview = false } = {}) {
       pageSize: form.pageSize,
       startOffset: form.startOffset,
       sort: form.sort,
-      keepRaw: form.keepRaw,
       debug: form.debugMode,
       signal: controller.signal,
       onProgress: ({ fetched, target, page, totalCount, titleDuplicates }) =>
@@ -785,8 +778,8 @@ async function runSearch({ preview = false } = {}) {
     }
 
     const saved = state.store.saveArticles(result.articles, {
-      searchId: runId, query: form.query || form.author,
-      overwrite: form.overwrite, keepRaw: form.keepRaw,
+      searchId: runId,
+      overwrite: form.overwrite,
       dedupeByTitle: form.dedupeByTitle,
     });
     const titleDuplicates = (result.titleDuplicates || 0) + (saved.titleDuplicates || 0);
@@ -878,14 +871,6 @@ function showPreview(result) {
   ]);
   body.append(el('div', { class: 'tablewrap' }, [table]));
 
-  if (result.articles[0]?.raw) {
-    let pretty = result.articles[0].raw;
-    try { pretty = JSON.stringify(JSON.parse(pretty), null, 2); } catch { /* as-is */ }
-    body.append(el('details', { class: 'disclosure', style: 'margin-top:16px' }, [
-      el('summary', { text: 'Raw JSON of the first result' }),
-      el('div', { class: 'disclosure__body' }, [el('pre', {}, [el('code', { text: pretty })])]),
-    ]));
-  }
   $('.dialog__title', $('#detailDialog')).textContent = 'Preview — not saved';
   $('#detailDialog').showModal();
 }
@@ -898,9 +883,9 @@ async function loadDemo() {
   }
   const items = api.sampleItems();
   const runId = state.store.beginSearch('coffee (sample data)', { demo: true }, 'sample data — no API call');
-  const articles = items.map((item) => api.normaliseItem(item, { query: 'coffee (sample data)', keepRaw: true }));
+  const articles = items.map((item) => api.normaliseItem(item));
   const saved = state.store.saveArticles(articles, {
-    searchId: runId, query: 'coffee (sample data)', keepRaw: true,
+    searchId: runId,
   });
   state.store.finishSearch(runId, {
     returned: articles.length, inserted: saved.inserted, duplicates: saved.duplicates,
@@ -944,7 +929,7 @@ async function importFile(file) {
         .map((row) => ({ ...row, id: String(row.id) }));
       if (!rows.length) throw new Error('No usable articles found in that file.');
       const before = state.store.count('articles');
-      state.store.saveArticles(rows, { query: 'imported', keepRaw: true });
+      state.store.saveArticles(rows);
       const added = state.store.count('articles') - before;
       await state.store.save();
       toast('Imported', `${fmtInt(rows.length)} article${rows.length === 1 ? '' : 's'} read · ${fmtInt(added)} new`, 'ok');
@@ -1001,14 +986,8 @@ const SQL_SAMPLES = [
     "SELECT substr(date, 1, 7) AS month, COUNT(*) AS articles\nFROM articles\nWHERE date != ''\nGROUP BY month\nORDER BY month DESC;"],
   ['Most recent 50 articles',
     'SELECT date, publication, title, url\nFROM articles\nORDER BY date DESC\nLIMIT 50;'],
-  ['Search the summaries',
-    "SELECT date, publication, title\nFROM articles\nWHERE summary LIKE '%climate%'\nORDER BY date DESC;"],
   ['Articles found by more than one search',
     'SELECT a.title, COUNT(s.search_id) AS searches\nFROM articles a\nJOIN article_searches s ON s.article_id = a.id\nGROUP BY a.id\nHAVING searches > 1\nORDER BY searches DESC;'],
-  ['Sentiment breakdown',
-    "SELECT sentiment, COUNT(*) AS articles\nFROM articles\nWHERE sentiment IS NOT NULL AND sentiment != ''\nGROUP BY sentiment\nORDER BY articles DESC;"],
-  ['Most frequent authors',
-    "SELECT author, COUNT(*) AS articles\nFROM articles\nWHERE author IS NOT NULL AND author != ''\nGROUP BY author\nORDER BY articles DESC\nLIMIT 25;"],
   ['Every search I have run',
     'SELECT id, query, started_at, returned, inserted, duplicates, status\nFROM searches\nORDER BY id DESC;'],
 ];

@@ -1,7 +1,8 @@
-# 📰 PressReader News Scraper
+# 📰 PressReader Collector
 
-Search the [PressReader Discovery API](https://www.pressreader.com/), store what you find in a
-**SQLite database**, and export it to **Excel, CSV, JSON, Markdown, RIS, BibTeX** or a `.db` file.
+Search the [PressReader Discovery API](https://www.pressreader.com/), build a local citation index in
+**SQLite**, and export it to **Excel or CSV**. Other specialist formats remain available under an
+advanced disclosure.
 
 Two ways to use it, sharing one database format:
 
@@ -37,7 +38,7 @@ through the site's restricted Cloudflare Worker to PressReader.
   IndexedDB after every change. Download the `.db` any time and open it in DB Browser for SQLite,
   Python, R — or the notebook.
 - 🔍 **Simple search first** — the main screen shows only the query, date range and search buttons.
-  Countries, languages and publication filters are under *More filters*; paging, sorting, raw JSON,
+  Countries, languages and publication filters are under *More filters*; paging, sorting,
   debugging and other technical controls are under *Advanced options*.
 - 🗓️ **Useful current-news defaults** — new and upgraded browsers start at one calendar year ago
   and sort newest first. Clear the date or choose relevance whenever you need a wider archive search.
@@ -49,18 +50,21 @@ through the site's restricted Cloudflare Worker to PressReader.
 - 🧹 **Two layers of de-duplication** — article-ID protection is always active; optional title
   matching skips syndicated copies and reports the number skipped. The Results table can also hide
   title duplicates already present without deleting the underlying records.
-- 📄 **Browse what you collected** — filter, clear all filters in one click, sort, page, tick rows and
-  inspect every field including the raw JSON. The API-key panel collapses after a key is entered to
-  keep the search controls compact.
+- 📄 **Citation metadata, not article text** — the database keeps only the seven fields confirmed in
+  live Discovery results: title, publication, date, page, article URL, publication CID and article ID.
+  Click through to PressReader to read at the source.
+- 📄 **Browse what you collected** — filter, clear all filters in one click, sort, page and tick rows.
+  The API-key panel collapses after a key is entered to keep the search controls compact.
 - ⌨️ **A read-only SQL console** with worked examples, and the query result is exportable too.
-- 📤 **Ten export formats**, with a live preview of exactly what will be written.
+- 📤 **Excel and CSV first** — the two common choices are prominent; column choices, preview and
+  specialist formats are collapsed until needed.
 - 🌓 Light and dark themes; works on a phone.
 - 🧪 **Sample data** so you can try the whole workflow before you have a key.
 
 ### Try it without a key
 
 Open the app and click **Load sample data**. Twelve realistic articles are inserted through the same
-code path a live search uses, so every tab — including all ten exports — behaves exactly as it will
+code path a live search uses, so every tab — including exports — behaves exactly as it will
 with real data. Nothing is sent to PressReader.
 
 ### Title de-duplication
@@ -78,9 +82,9 @@ stored before this feature existed. It changes only the view—it does not delet
 
 | Format | Notes |
 | --- | --- |
-| **Excel** `.xlsx` | Bold frozen header, auto-filter, sized columns, **real** date and number cells, plus *By publication*, *By month*, *By language* and *Searches* summary sheets |
+| **Excel** `.xlsx` | Bold frozen header, auto-filter, sized columns, **real** date and number cells, plus *By publication*, *By month* and *Searches* summary sheets |
 | **CSV** / **TSV** | RFC 4180 quoting, CRLF line endings, optional UTF-8 BOM so Excel on Windows keeps your accents |
-| **JSON** | With export metadata; the stored raw API response is re-nested as a real object |
+| **JSON** | The selected citation fields plus export metadata |
 | **JSON Lines** `.ndjson` | One article per line, for streaming tools |
 | **Markdown** | The readable article-per-section layout the notebook produces |
 | **HTML** | A standalone, styled, dark-mode-aware table |
@@ -93,7 +97,7 @@ search), and the sort order.
 > **Formula injection is neutralised by default.** A cell whose text begins with `=`, `+`, `-` or
 > `@` is treated as a formula by every spreadsheet program — so a hostile headline could execute
 > when you open the file. The app prefixes such cells with an apostrophe. You can turn this off
-> under *Format options*.
+> under *Customize export*.
 
 The Excel writer is this project's own code — no spreadsheet library is downloaded, so exports work
 offline and no third party ever touches your data. Its output is validated against `openpyxl`.
@@ -179,9 +183,9 @@ header (`Ocp-Apim-Subscription-Key` also works).
 | Body | `startDate`, `endDate` | `YYYY-MM-DD`; start is inclusive, end exclusive |
 | Body | `itemTypes` | `article` (default) or `page` |
 
-The response is `{ items: [...], meta: { totalCount, offset, limit } }`. Each item carries
-`publication`, `issue`, `page`, `article`, `summary`, `categories`, `entities` and `sentiment` — all
-of which the web app stores.
+The response is `{ items: [...], meta: { totalCount, offset, limit } }`. The collector deliberately
+allowlists only the fields confirmed in its live debug report: title, publication, date, page,
+article URL, publication CID and article ID. Other response fields never enter SQLite.
 
 Getting a key is a manual process through PressReader: an
 [API access registration](https://pressreader.atlassian.net/wiki/spaces/PD/pages/68091914/Subscription+Key)
@@ -192,11 +196,7 @@ ticket, or your account manager.
 ## 🗄️ Database schema
 
 ```sql
-articles(id PK, title, subtitle, summary, publication, publication_cid, publication_type,
-         publisher, issn, author, section, content, date, page, issue_page_count,
-         language, countries, categories, entities, sentiment,
-         copyright, url, issue_url, publication_url, page_url, image_url, media_count,
-         first_query, first_run_id, fetched_at, raw)
+articles(id PK, title, publication, publication_cid, date, page, url)
 
 searches(id PK, query, params, endpoint, started_at, finished_at,
          returned, inserted, duplicates, status, message)
@@ -204,13 +204,8 @@ searches(id PK, query, params, endpoint, started_at, finished_at,
 article_searches(article_id, search_id, position)   -- which run found what, and where it ranked
 ```
 
-`raw` holds the untouched API response for each article, so you can reach fields the app does not
-model — `SELECT json_extract(raw, '$.entities[0].name') FROM articles;` works, since sql.js ships
-with SQLite's JSON functions.
-
-`content` stores full article text only when the Discovery API includes it. Many search results
-contain metadata, a summary and PressReader links but no full text. The web app does not scrape the
-linked reading page to fill that gap.
+Article bodies, summaries and untouched API responses are not stored. The database is a searchable
+index of citations and links; reading remains on PressReader.
 
 ---
 

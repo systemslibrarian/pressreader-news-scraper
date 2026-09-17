@@ -138,41 +138,17 @@ async function idbDelete(key) {
 
 /* ----------------------------------------------------------------- schema -- */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS articles (
   id               TEXT PRIMARY KEY,
   title            TEXT,
-  subtitle         TEXT,
-  summary          TEXT,
   publication      TEXT,
   publication_cid  TEXT,
-  publication_type TEXT,
-  publisher        TEXT,
-  issn             TEXT,
-  author           TEXT,
-  section          TEXT,
-  content          TEXT,
   date             TEXT,
   page             INTEGER,
-  issue_page_count INTEGER,
-  language         TEXT,
-  countries        TEXT,
-  categories       TEXT,
-  entities         TEXT,
-  sentiment        TEXT,
-  copyright        TEXT,
-  url              TEXT,
-  issue_url        TEXT,
-  publication_url  TEXT,
-  page_url         TEXT,
-  image_url        TEXT,
-  media_count      INTEGER,
-  first_query      TEXT,
-  first_run_id     INTEGER,
-  fetched_at       TEXT,
-  raw              TEXT
+  url              TEXT
 );
 
 CREATE TABLE IF NOT EXISTS searches (
@@ -203,7 +179,6 @@ CREATE TABLE IF NOT EXISTS meta (
 
 CREATE INDEX IF NOT EXISTS idx_articles_date        ON articles(date);
 CREATE INDEX IF NOT EXISTS idx_articles_publication ON articles(publication);
-CREATE INDEX IF NOT EXISTS idx_articles_fetched     ON articles(fetched_at);
 CREATE INDEX IF NOT EXISTS idx_as_search            ON article_searches(search_id);
 `;
 
@@ -213,46 +188,22 @@ CREATE INDEX IF NOT EXISTS idx_as_search            ON article_searches(search_i
  * want in a spreadsheet; `width` is the Excel column width.
  */
 export const ARTICLE_COLUMNS = [
-  { key: 'id',               label: 'Article ID',       core: true,  width: 14 },
   { key: 'title',            label: 'Title',            core: true,  width: 52 },
-  { key: 'subtitle',         label: 'Subtitle',         core: false, width: 34 },
-  { key: 'summary',          label: 'Summary',          core: true,  width: 72 },
   { key: 'publication',      label: 'Publication',      core: true,  width: 26 },
   { key: 'date',             label: 'Date',             core: true,  width: 12 },
-  { key: 'author',           label: 'Author',           core: true,  width: 22 },
+  { key: 'page',             label: 'Page',             core: true,  width: 7  },
   { key: 'url',              label: 'Article URL',      core: true,  width: 46 },
-  { key: 'section',          label: 'Section',          core: false, width: 16 },
-  { key: 'content',          label: 'Full text (when supplied)', core: false, width: 90 },
-  { key: 'page',             label: 'Page',             core: false, width: 7  },
-  { key: 'issue_page_count', label: 'Pages in issue',   core: false, width: 13 },
-  { key: 'language',         label: 'Language',         core: false, width: 10 },
-  { key: 'countries',        label: 'Countries',        core: false, width: 12 },
-  { key: 'categories',       label: 'Categories',       core: false, width: 24 },
-  { key: 'entities',         label: 'Entities',         core: false, width: 30 },
-  { key: 'sentiment',        label: 'Sentiment',        core: false, width: 11 },
-  { key: 'publication_cid',  label: 'Publication CID',  core: false, width: 15 },
-  { key: 'publication_type', label: 'Publication type', core: false, width: 16 },
-  { key: 'publisher',        label: 'Publisher',        core: false, width: 24 },
-  { key: 'issn',             label: 'ISSN',             core: false, width: 12 },
-  { key: 'copyright',        label: 'Copyright',        core: false, width: 28 },
-  { key: 'issue_url',        label: 'Issue URL',        core: false, width: 40 },
-  { key: 'publication_url',  label: 'Publication URL',  core: false, width: 40 },
-  { key: 'page_url',         label: 'Page URL',         core: false, width: 40 },
-  { key: 'image_url',        label: 'Image URL',        core: false, width: 40 },
-  { key: 'media_count',      label: 'Media items',      core: false, width: 11 },
-  { key: 'first_query',      label: 'Found by search',  core: false, width: 20 },
-  { key: 'fetched_at',       label: 'Collected at',     core: false, width: 20 },
-  { key: 'raw',              label: 'Raw JSON',         core: false, width: 60 },
+  { key: 'publication_cid',  label: 'Publication CID',  core: true,  width: 15 },
+  { key: 'id',               label: 'Article ID',       core: true,  width: 16 },
 ];
 
 /** Columns whose SQLite affinity is numeric. */
-export const NUMERIC_COLUMNS = new Set(['page', 'media_count', 'issue_page_count']);
+export const NUMERIC_COLUMNS = new Set(['page']);
 
-const INSERT_COLS = ARTICLE_COLUMNS.map((c) => c.key).filter((k) => k !== 'first_run_id');
+const INSERT_COLS = ARTICLE_COLUMNS.map((c) => c.key);
 
-/** Columns a refresh may overwrite: everything except the identity and the
-    record of when and how the article was first collected. */
-const PROVENANCE_COLS = new Set(['id', 'first_query', 'first_run_id', 'fetched_at']);
+/** Columns a refresh may overwrite: everything except the stable identity. */
+const PROVENANCE_COLS = new Set(['id']);
 const CONTENT_COLS = INSERT_COLS.filter((k) => !PROVENANCE_COLS.has(k));
 
 /** Statement kinds the SQL console will run. Tested against normalised SQL. */
@@ -308,8 +259,17 @@ export class Store {
         this.db.exec(`ALTER TABLE articles ADD COLUMN ${col.key} ${type}`);
       }
     }
-    if (!have.has('first_run_id')) {
-      try { this.db.exec('ALTER TABLE articles ADD COLUMN first_run_id INTEGER'); } catch { /* present */ }
+    // Schema v2 is a strict ingest allowlist based on fields confirmed in live
+    // Discovery responses. Remove every legacy article column not on that list.
+    this.db.exec('DROP INDEX IF EXISTS idx_articles_fetched');
+    const allowed = new Set(ARTICLE_COLUMNS.map((col) => col.key));
+    for (const legacy of [...have].filter((col) => !allowed.has(col))) {
+      if (!have.has(legacy)) continue;
+      try {
+        this.db.exec(`ALTER TABLE articles DROP COLUMN ${legacy}`);
+      } catch {
+        this.db.exec(`UPDATE articles SET ${legacy} = NULL`);
+      }
     }
     this.setMeta('schema_version', String(SCHEMA_VERSION));
     this.setMeta('app', 'pressreader-collector');
@@ -441,18 +401,16 @@ export class Store {
   /**
    * Inserts a batch of normalised articles.
    *
-   * Provenance columns (`first_query`, `first_run_id`, `fetched_at`) record when
-   * an article was *first* seen, so refreshing an existing row updates its
-   * content but leaves those alone.
+   * Search provenance lives in `article_searches`; this table receives only
+   * the seven allowlisted citation fields.
    *
    * @returns {{inserted: number, duplicates: number, titleDuplicates: number, updated: number}}
    */
   saveArticles(articles, {
-    searchId = null, query = '', overwrite = false, keepRaw = true,
+    searchId = null, overwrite = false,
     dedupeByTitle = false,
   } = {}) {
     let inserted = 0, duplicates = 0, titleDuplicates = 0, updated = 0;
-    const fetchedAt = new Date().toISOString();
 
     // Preserve the earliest stored row as the canonical copy for a title.
     // This is deliberately in JavaScript so title normalisation is identical
@@ -468,17 +426,14 @@ export class Store {
     const placeholders = INSERT_COLS.map(() => '?').join(', ');
     const exists = this.db.prepare('SELECT 1 FROM articles WHERE id = ?');
     const insert = this.db.prepare(
-      `INSERT OR IGNORE INTO articles (${INSERT_COLS.join(', ')}, first_run_id)
-       VALUES (${placeholders}, ?)`);
+      `INSERT OR IGNORE INTO articles (${INSERT_COLS.join(', ')})
+       VALUES (${placeholders})`);
     const update = this.db.prepare(
       `UPDATE articles SET ${CONTENT_COLS.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`);
     const link = this.db.prepare(
       'INSERT OR IGNORE INTO article_searches (article_id, search_id, position) VALUES (?, ?, ?)');
 
     const valueFor = (article, col) => {
-      if (col === 'fetched_at') return fetchedAt;
-      if (col === 'first_query') return article.first_query ?? query ?? null;
-      if (col === 'raw') return keepRaw ? (article.raw ?? null) : null;
       const v = article[col];
       return v === undefined ? null : v;
     };
@@ -501,7 +456,7 @@ export class Store {
           if (searchId != null) link.run([sameTitleId, searchId, i]);
           return;
         } else if (!already) {
-          insert.run([...INSERT_COLS.map((col) => valueFor(article, col)), searchId]);
+          insert.run(INSERT_COLS.map((col) => valueFor(article, col)));
           inserted += 1;
           if (key) storedTitles.set(key, id);
         } else if (overwrite) {
@@ -608,7 +563,7 @@ export class Store {
         : [];
 
       const before = this.count('articles');
-      this.saveArticles(rows, { overwrite: false, keepRaw: true });
+      this.saveArticles(rows, { overwrite: false });
       const added = this.count('articles') - before;
 
       let searchesAdded = 0;

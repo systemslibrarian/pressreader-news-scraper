@@ -167,56 +167,22 @@ export function buildRequestBody(form) {
 /* ------------------------------------------------------------ normalising -- */
 
 const str = (v) => (v === null || v === undefined ? null : String(v));
-const joinNames = (arr, key = 'name') =>
-  Array.isArray(arr) && arr.length
-    ? arr.map((x) => (x && typeof x === 'object' ? x[key] : x)).filter(Boolean).join('; ')
-    : null;
-
 /** Turns one SearchResultItem into a row for the `articles` table. */
-export function normaliseItem(item, { query = '', keepRaw = true } = {}) {
+export function normaliseItem(item) {
   const article = item?.article || {};
   const publication = item?.publication || {};
   const issue = item?.issue || {};
   const page = item?.page || {};
-  const media = Array.isArray(article.media) ? article.media : [];
-  // The live API sends typeName: "Image" (capitalised) and a numeric type,
-  // which is not what the published schema's lowercase enum suggests.
-  const image = media.find((m) => m && String(m.typeName ?? '').toLowerCase() === 'image') || media[0];
-
-  const authors = joinNames(article.authors);
   const date = str(issue.date);
 
   return {
     id: str(article.id ?? item?.id ?? crypto.randomUUID()),
-    title: str(article.title),
-    subtitle: str(article.subTitle),
-    summary: str(item?.summary),
+    title: str(article.title) ? cleanSearchText(article.title) : null,
     publication: str(publication.title),
     publication_cid: str(publication.cid),
-    publication_type: str(publication.publicationType),
-    publisher: str(publication.publisher?.name ?? publication.publisher),
-    issn: str(publication.issn),
-    author: str(article.author) || authors,
-    section: str(article.section),
-    content: str(item?.content ?? article.content),
     date: date ? date.split('T')[0] : null,
     page: Number.isFinite(Number(page.number)) && page.number !== null ? Number(page.number) : null,
-    issue_page_count: Number.isFinite(Number(issue.pageCount)) && issue.pageCount !== null
-      ? Number(issue.pageCount) : null,
-    language: str(publication.language),
-    countries: Array.isArray(publication.countries) ? publication.countries.join(', ') : str(publication.countries),
-    categories: joinNames(item?.categories),
-    entities: joinNames(item?.entities),
-    sentiment: str(item?.sentiment),
-    copyright: str(article.copyright),
     url: str(article.url),
-    issue_url: str(issue.url),
-    publication_url: str(publication.url),
-    page_url: str(page.url),
-    image_url: str(image?.url || image?.thumbnailUrl),
-    media_count: media.length || null,
-    first_query: query || null,
-    raw: keepRaw ? JSON.stringify(item) : null,
   };
 }
 
@@ -279,7 +245,7 @@ function describeNetworkError(err, usingProxy) {
 
 /**
  * Runs one request.
- * @returns {Promise<{items: object[], meta: object, raw: object}>}
+ * @returns {Promise<{items: object[], meta: object, diagnostics: object}>}
  */
 export async function fetchPage({ apiKey, conn, body, offset, limit, sort, signal }) {
   const url = buildRequestUrl(conn, { offset, limit, sort });
@@ -340,7 +306,6 @@ export async function fetchPage({ apiKey, conn, body, offset, limit, sort, signa
   return {
     items,
     meta: payload?.meta || {},
-    raw: payload,
     diagnostics: {
       url, offset, limit, sort: sort || '(API default)', status: response.status,
       durationMs: Math.round((globalThis.performance?.now?.() ?? Date.now()) - started),
@@ -356,7 +321,7 @@ export async function fetchPage({ apiKey, conn, body, offset, limit, sort, signa
  */
 export async function search({
   apiKey, conn, form, wantTotal = 25, pageSize = 25, startOffset = 0,
-  sort = '', keepRaw = true, signal, onProgress, pauseMs = 350, debug = false,
+  sort = '', signal, onProgress, pauseMs = 350, debug = false,
 }) {
   const body = buildRequestBody(form);
   if (!body.query && !body.author) {
@@ -407,7 +372,7 @@ export async function search({
     if (Number.isFinite(Number(meta?.totalCount))) totalCount = Number(meta.totalCount);
 
     for (const item of items) {
-      const row = normaliseItem(item, { query: body.query || body.author || '', keepRaw });
+      const row = normaliseItem(item);
       if (seen.has(row.id)) continue;      // the API can repeat an item across pages
       seen.add(row.id);
       if (form.dedupeByTitle) {
